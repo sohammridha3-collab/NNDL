@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inclusive Resume and Job Matching System | SDG 10</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              900: '#14532d',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- TOP HEADER -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
+          <i data-lucide="sparkles" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <span class="font-extrabold text-lg text-slate-900 tracking-tight flex items-center gap-2">
+            Inclusive ATS
+            <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">SDG 10</span>
+          </span>
+          <p class="text-xs text-slate-500 hidden sm:block">AI-Powered Fair Resume & Job Matching</p>
+        </div>
+      </div>
+
+      <!-- NAVIGATION TABS -->
+      <nav class="hidden md:flex items-center space-x-1 bg-slate-100 p-1 rounded-xl" id="navTabs">
+        <button onclick="switchTab('matcher')" id="tabBtn-matcher" class="nav-btn px-3 py-1.5 rounded-lg text-sm font-semibold text-brand-700 bg-white shadow-sm transition">
+          Live AI Matcher
+        </button>
+        <button onclick="switchTab('candidate')" id="tabBtn-candidate" class="nav-btn px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 transition">
+          Candidate Portal
+        </button>
+        <button onclick="switchTab('recruiter')" id="tabBtn-recruiter" class="nav-btn px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 transition">
+          Recruiter Hub
+        </button>
+        <button onclick="switchTab('fairness')" id="tabBtn-fairness" class="nav-btn px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5">
+          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
+          SDG 10 Fairness
+        </button>
+      </nav>
+
+      <!-- AUTH BUTTONS / USER BADGE -->
+      <div class="flex items-center space-x-3" id="authSection">
+        <button onclick="openAuthModal('login')" class="text-sm font-semibold text-slate-700 hover:text-brand-600 px-3 py-1.5 transition">
+          Sign In
+        </button>
+        <button onclick="openAuthModal('register')" class="bg-slate-900 text-white hover:bg-slate-800 text-sm font-semibold px-4 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+          Get Started
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- NOTIFICATION TOAST -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform transition-all duration-300 translate-y-24 opacity-0 pointer-events-none">
+    <div id="toastContent" class="bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 text-sm font-medium border border-slate-700">
+      <i id="toastIcon" data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+      <span id="toastMsg">Notification message</span>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
+
+    <!-- ======================================================== -->
+    <!-- TAB 1: LIVE AI MATCHER (DEFAULT & PROMINENT)             -->
+    <!-- ======================================================== -->
+    <section id="tab-matcher" class="tab-pane space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-emerald-900 via-slate-900 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl">
+        <div>
+          <div class="flex items-center gap-2 mb-2">
+            <span class="bg-emerald-500/20 text-emerald-300 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider border border-emerald-400/20">
+              Live PyTorch Inference
+            </span>
+            <span class="text-xs text-slate-400">770-Feature Neural Classifier</span>
+          </div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">AI Resume & Job Matching Engine</h1>
+          <p class="text-slate-300 text-sm max-w-2xl mt-1">
+            Real calibrated model inference using Sentence Transformers (<code class="text-emerald-300 font-mono">all-MiniLM-L6-v2</code>) and PyTorch MLP classifier. Irrelevant demographics are masked automatically (SDG 10).
+          </p>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="loadSampleMatchData(1)" class="bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3 py-2 rounded-xl transition border border-white/10">
+            Sample ML Pair
+          </button>
+          <button onclick="loadSampleMatchData(2)" class="bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3 py-2 rounded-xl transition border border-white/10">
+            Sample Web Pair
+          </button>
+        </div>
+      </div>
+
+      <!-- INPUT PAIR BOXES -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Resume Input Card -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-bold text-slate-900 flex items-center gap-2 text-base">
+              <i data-lucide="file-text" class="w-5 h-5 text-brand-600"></i>
+              Candidate Resume
+            </h3>
+            <span class="text-xs text-slate-500">Plain text, PDF, or DOCX</span>
+          </div>
+          <textarea id="matcherResumeText" rows="10" placeholder="Paste resume plain text here, or upload above in Candidate Portal..." class="w-full p-4 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm font-mono leading-relaxed resize-none flex-1"></textarea>
+        </div>
+
+        <!-- Job Description Card -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-bold text-slate-900 flex items-center gap-2 text-base">
+              <i data-lucide="briefcase" class="w-5 h-5 text-brand-600"></i>
+              Job Description
+            </h3>
+            <span class="text-xs text-slate-500">Role requirements & skills</span>
+          </div>
+          <textarea id="matcherJobText" rows="10" placeholder="Paste job description requirements and technical competencies here..." class="w-full p-4 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm font-mono leading-relaxed resize-none flex-1"></textarea>
+        </div>
+      </div>
+
+      <!-- PREDICT BUTTON -->
+      <div class="flex justify-center">
+        <button id="btnRunPrediction" onclick="runAiPrediction()" class="bg-brand-600 hover:bg-brand-700 text-white font-bold px-8 py-3.5 rounded-2xl shadow-lg shadow-brand-600/30 transition transform hover:-translate-y-0.5 flex items-center gap-2 text-base">
+          <i data-lucide="cpu" class="w-5 h-5"></i>
+          <span>Run Real Model Inference</span>
+        </button>
+      </div>
+
+      <!-- INFERENCE RESULTS CARD (HIDDEN UNTIL RUN) -->
+      <div id="matcherResultCard" class="hidden bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-slate-100 gap-4">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Prediction Outcome</span>
+            <div class="flex items-center gap-3 mt-1">
+              <span id="resClassificationBadge" class="px-4 py-1.5 rounded-full text-sm font-extrabold bg-emerald-100 text-emerald-800">
+                Strong Match
+              </span>
+              <span class="text-xs text-slate-500" id="resModelVersion">MiniLM + PyTorch MLP</span>
+            </div>
+          </div>
+          <div class="flex items-baseline gap-2">
+            <span class="text-4xl font-extrabold text-slate-900" id="resCompatibilityScore">0.0%</span>
+            <span class="text-sm font-medium text-slate-500">Compatibility Probability</span>
+          </div>
+        </div>
+
+        <!-- 4 KEY FACTOR METRICS -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <span class="text-xs font-semibold text-slate-500">Semantic Cosine</span>
+            <p class="text-2xl font-bold text-slate-900 mt-1" id="resSemanticScore">0.00</p>
+            <span class="text-[11px] text-slate-400">MiniLM embedding vector</span>
+          </div>
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <span class="text-xs font-semibold text-slate-500">Skill Coverage</span>
+            <p class="text-2xl font-bold text-slate-900 mt-1" id="resSkillCoverage">0%</p>
+            <span class="text-[11px] text-slate-400">Job skills present</span>
+          </div>
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <span class="text-xs font-semibold text-slate-500">Trained Threshold</span>
+            <p class="text-2xl font-bold text-slate-900 mt-1" id="resThreshold">0.9032</p>
+            <span class="text-[11px] text-slate-400">Validated decision gate</span>
+          </div>
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <span class="text-xs font-semibold text-slate-500">Feature Vector</span>
+            <p class="text-2xl font-bold text-slate-900 mt-1">770 Dim</p>
+            <span class="text-[11px] text-slate-400">Scaled & tensorized</span>
+          </div>
+        </div>
+
+        <!-- SKILLS OVERLAP BREAKDOWN -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+          <div>
+            <h4 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+              <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i>
+              Matched Skills Identified
+            </h4>
+            <div id="resMatchedSkillsContainer" class="flex flex-wrap gap-2">
+              <span class="text-xs text-slate-400">No skills analyzed yet</span>
+            </div>
+          </div>
+          <div>
+            <h4 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+              <i data-lucide="alert-circle" class="w-4 h-4 text-amber-500"></i>
+              Missing Required Skills
+            </h4>
+            <div id="resMissingSkillsContainer" class="flex flex-wrap gap-2">
+              <span class="text-xs text-slate-400">No missing skills detected</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- EXPLAINABLE AI RECOMMENDATIONS -->
+        <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+          <h4 class="text-sm font-bold text-slate-900 mb-2 flex items-center gap-2">
+            <i data-lucide="lightbulb" class="w-4 h-4 text-amber-500"></i>
+            Explainable AI Insights & Recommendations
+          </h4>
+          <ul id="resRecommendationsList" class="space-y-2 text-sm text-slate-600 list-disc list-inside">
+            <li>Awaiting prediction analysis...</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- TAB 2: CANDIDATE PORTAL                                  -->
+    <!-- ======================================================== -->
+    <section id="tab-candidate" class="tab-pane hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Resume Upload & ATS Score -->
+        <div class="lg:col-span-1 space-y-6">
+          <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 class="font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <i data-lucide="upload-cloud" class="w-5 h-5 text-brand-600"></i>
+              Upload Your Resume
+            </h3>
+            
+            <div id="dropZone" class="border-2 border-dashed border-slate-200 hover:border-brand-500 rounded-2xl p-6 text-center cursor-pointer transition bg-slate-50 hover:bg-slate-100/50">
+              <input type="file" id="resumeFileInput" accept=".pdf,.docx,.txt" class="hidden" onchange="handleResumeFileSelected(this.files[0])">
+              <i data-lucide="file-up" class="w-10 h-10 text-slate-400 mx-auto mb-2"></i>
+              <p class="text-sm font-semibold text-slate-700">Click to upload or drag & drop</p>
+              <p class="text-xs text-slate-400 mt-1">PDF, DOCX, or TXT up to 10MB</p>
+            </div>
+
+            <!-- Active Resume Details -->
+            <div id="activeResumeCard" class="mt-5 hidden space-y-3">
+              <div class="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div class="flex items-center gap-2 overflow-hidden">
+                  <i data-lucide="file-check" class="w-5 h-5 text-emerald-600 shrink-0"></i>
+                  <span id="cardFileName" class="text-xs font-semibold text-slate-800 truncate">resume.pdf</span>
+                </div>
+                <span id="cardAtsBadge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">ATS 85%</span>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 text-center text-xs">
+                <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                  <span class="text-slate-400 block">Completeness</span>
+                  <span id="cardCompleteness" class="font-bold text-slate-800 text-sm">90%</span>
+                </div>
+                <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                  <span class="text-slate-400 block">Skills Detected</span>
+                  <span id="cardSkillsCount" class="font-bold text-slate-800 text-sm">8</span>
+                </div>
+              </div>
+
+              <button onclick="runDeepResumeAnalysis()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-2 rounded-xl transition flex items-center justify-center gap-1.5">
+                <i data-lucide="file-search" class="w-4 h-4"></i>
+                Detailed ATS Breakdown
+              </button>
+            </div>
+          </div>
+
+          <!-- Application Tracking -->
+          <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 class="font-bold text-slate-900 mb-3 flex items-center gap-2">
+              <i data-lucide="layers" class="w-5 h-5 text-brand-600"></i>
+              My Applications
+            </h3>
+            <div id="myApplicationsList" class="space-y-3">
+              <p class="text-xs text-slate-400">Loading applications...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Top Recommended Jobs -->
+        <div class="lg:col-span-2 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="compass" class="w-5 h-5 text-brand-600"></i>
+              Personalized Job Recommendations
+            </h2>
+            <div class="flex gap-2">
+              <button onclick="loadRecommendedJobs(5)" class="text-xs font-bold px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 transition">Top 5</button>
+              <button onclick="loadRecommendedJobs(10)" class="text-xs font-bold px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 rounded-lg transition">Top 10</button>
+            </div>
+          </div>
+
+          <div id="recommendedJobsContainer" class="space-y-4">
+            <div class="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-200">
+              Upload your resume to receive AI recommendations reranked by our PyTorch matching model.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- TAB 3: RECRUITER HUB                                     -->
+    <!-- ======================================================== -->
+    <section id="tab-recruiter" class="tab-pane hidden space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-900">Recruiter AI Dashboard</h2>
+          <p class="text-sm text-slate-500">Manage openings and review applicants ranked by AI compatibility without automated rejection bias.</p>
+        </div>
+        <button onclick="openPostJobModal()" class="bg-brand-600 hover:bg-brand-700 text-white font-bold px-4 py-2.5 rounded-xl shadow-sm text-sm transition flex items-center gap-1.5">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i>
+          Post New Opening
+        </button>
+      </div>
+
+      <!-- PIPELINE STATS -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <span class="text-xs font-semibold text-slate-400">Active Job Posts</span>
+          <p class="text-3xl font-extrabold text-slate-900 mt-1" id="recActiveJobsCount">0</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <span class="text-xs font-semibold text-slate-400">Total Applicants</span>
+          <p class="text-3xl font-extrabold text-slate-900 mt-1" id="recTotalApplicantsCount">0</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <span class="text-xs font-semibold text-slate-400">Shortlisted</span>
+          <p class="text-3xl font-extrabold text-emerald-600 mt-1" id="recShortlistedCount">0</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <span class="text-xs font-semibold text-slate-400">In Interview</span>
+          <p class="text-3xl font-extrabold text-blue-600 mt-1" id="recInterviewCount">0</p>
+        </div>
+      </div>
+
+      <!-- ACTIVE JOBS & APPLICANTS LIST -->
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <h3 class="font-bold text-slate-900 text-base">Your Job Openings</h3>
+        <div id="recruiterJobsList" class="space-y-3">
+          <p class="text-sm text-slate-400">Loading jobs...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- TAB 4: SDG 10 FAIRNESS & BIAS AUDIT CENTER               -->
+    <!-- ======================================================== -->
+    <section id="tab-fairness" class="tab-pane hidden space-y-6">
+      <div class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-3 py-0.5 rounded-full">
+                UN SDG 10: Reduced Inequalities
+              </span>
+            </div>
+            <h2 class="text-2xl font-extrabold text-slate-900">Demographic Invariance & Fairness Audit</h2>
+            <p class="text-sm text-slate-500 max-w-2xl mt-1">
+              Evaluates model score stability across counterfactual resume pairs (varying names, gender pronouns, and ages) with and without personal detail masking.
+            </p>
+          </div>
+          <button onclick="runFairnessAuditLive()" id="btnRunFairnessAudit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-2xl shadow-sm transition flex items-center gap-2 text-sm">
+            <i data-lucide="shield-check" class="w-4 h-4"></i>
+            Run Live Fairness Audit
+          </button>
+        </div>
+
+        <!-- AUDIT SUMMARY METRICS -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4" id="fairnessMetricCards">
+          <div class="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100">
+            <span class="text-xs font-semibold text-emerald-800">Bias Reduction Through Masking</span>
+            <p class="text-3xl font-extrabold text-emerald-700 mt-1" id="fAuditReduction">98.5%</p>
+            <span class="text-xs text-emerald-600">Demographic variance mitigated</span>
+          </div>
+          <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+            <span class="text-xs font-semibold text-slate-600">Masked Score Deviation</span>
+            <p class="text-3xl font-extrabold text-slate-900 mt-1" id="fAuditDev">0.05 pts</p>
+            <span class="text-xs text-slate-400">Mean change across counterfactuals</span>
+          </div>
+          <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+            <span class="text-xs font-semibold text-slate-600">Decision Flip Rate</span>
+            <p class="text-3xl font-extrabold text-slate-900 mt-1" id="fAuditFlips">0.0%</p>
+            <span class="text-xs text-slate-400">Threshold flips from demographic tokens</span>
+          </div>
+        </div>
+
+        <!-- AUDIT REPORT TABLE -->
+        <div>
+          <h3 class="font-bold text-slate-900 text-base mb-3">Counterfactual Invariance Breakdown</h3>
+          <div class="overflow-x-auto rounded-2xl border border-slate-200">
+            <table class="w-full text-left text-sm" id="fairnessTable">
+              <thead class="bg-slate-50 text-slate-600 text-xs font-bold uppercase tracking-wider">
+                <tr>
+                  <th class="p-3.5">Protected Attribute</th>
+                  <th class="p-3.5">Masking Applied</th>
+                  <th class="p-3.5">Mean Score Change</th>
+                  <th class="p-3.5">95th Percentile</th>
+                  <th class="p-3.5">Decision Flip Rate</th>
+                  <th class="p-3.5">Sample Pairs</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 text-slate-700" id="fairnessTableBody">
+                <tr>
+                  <td colspan="6" class="p-4 text-center text-slate-400">Click "Run Live Fairness Audit" to evaluate model counterfactual sensitivity.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SDG 10 PRINCIPLES -->
+        <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200 text-xs text-slate-600 space-y-2">
+          <h4 class="font-bold text-slate-800 text-sm">SDG 10 Ethical AI Guidelines Implemented:</h4>
+          <p>• <strong>Strict Demographic Blindness:</strong> Names, phone numbers, pronouns, age, emails, and address tokens are masked before feature encoding.</p>
+          <p>• <strong>Human-in-the-Loop:</strong> The AI compatibility score assists recruiters with ranking but does not automate candidate rejection.</p>
+          <p>• <strong>Explainable Decisions:</strong> Predictions are accompanied by evidence-backed skill coverage and semantic alignment factors.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: AUTHENTICATION (SIGN IN / REGISTER)                -->
+  <!-- ======================================================== -->
+  <div id="authModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 border border-slate-100 relative">
+      <button onclick="closeAuthModal()" class="absolute top-5 right-5 text-slate-400 hover:text-slate-600">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="text-center">
+        <h3 class="text-xl font-bold text-slate-900" id="authModalTitle">Sign In to Inclusive ATS</h3>
+        <p class="text-xs text-slate-500 mt-1" id="authModalSub">Access your dashboard and matching history</p>
+      </div>
+
+      <!-- Role Selector (for Register) -->
+      <div id="registerRoleSelector" class="hidden grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+        <button type="button" onclick="setRegisterRole('candidate')" id="btnRoleCand" class="py-2 rounded-lg bg-white shadow-sm text-slate-900 transition">Candidate</button>
+        <button type="button" onclick="setRegisterRole('recruiter')" id="btnRoleRec" class="py-2 rounded-lg text-slate-500 hover:text-slate-900 transition">Recruiter</button>
+      </div>
+
+      <form id="authForm" onsubmit="handleAuthSubmit(event)" class="space-y-3.5">
+        <div id="authNameField" class="hidden">
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+          <input type="text" id="authFullName" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+        </div>
+
+        <div id="authCompanyField" class="hidden">
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Company Name</label>
+          <input type="text" id="authCompany" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
+          <input type="email" id="authEmail" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Password</label>
+          <input type="password" id="authPassword" required minlength="6" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+        </div>
+
+        <button type="submit" id="authSubmitBtn" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-xl transition text-sm shadow-md">
+          Sign In
+        </button>
+      </form>
+
+      <div class="text-center pt-2">
+        <button type="button" onclick="toggleAuthMode()" id="authToggleBtn" class="text-xs font-semibold text-brand-700 hover:underline">
+          Don't have an account? Create one
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: POST JOB (RECRUITER)                              -->
+  <!-- ======================================================== -->
+  <div id="postJobModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-4 border border-slate-100 relative max-h-[90vh] overflow-y-auto">
+      <button onclick="closePostJobModal()" class="absolute top-5 right-5 text-slate-400 hover:text-slate-600">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <h3 class="text-xl font-bold text-slate-900">Post New Job Opening</h3>
+
+      <form id="postJobForm" onsubmit="handlePostJobSubmit(event)" class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Job Title</label>
+          <input type="text" id="postJobTitle" required placeholder="e.g. Senior Machine Learning Engineer" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Category</label>
+            <input type="text" id="postJobCategory" value="Software & Technology" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Work Type</label>
+            <select id="postJobType" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <option value="remote">Remote</option>
+              <option value="hybrid">Hybrid</option>
+              <option value="on-site">On-Site</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Job Description & Responsibilities</label>
+          <textarea id="postJobDesc" rows="4" required placeholder="Describe day-to-day responsibilities, mission, and scope..." class="w-full p-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Required Skills (comma-separated)</label>
+          <input type="text" id="postJobSkills" placeholder="python, sql, docker, machine learning, aws" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+        </div>
+
+        <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-xl transition text-sm shadow-md mt-2">
+          Publish Job Opening
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="bg-white border-t border-slate-200 py-6 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 space-y-1">
+      <p>Inclusive Resume & Job Matching System • Developed under <strong>UN SDG 10: Reduced Inequalities</strong></p>
+      <p>Powered by FastAPI, PyTorch, Sentence Transformers (<code class="text-slate-700">all-MiniLM-L6-v2</code>), and SQLAlchemy ORM.</p>
+    </div>
+  </footer>
+
+  <!-- APP SCRIPTS -->
+  <script type="module" src="api.js"></script>
+  <script src="app.js"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>

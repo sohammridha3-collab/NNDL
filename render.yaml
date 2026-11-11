@@ -1,0 +1,47 @@
+services:
+  # Backend Web Service
+  - type: web
+    name: inclusive-ats-backend
+    env: python
+    region: oregon
+    plan: starter
+    rootDir: backend
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
+    startCommand: "python -m app.db.init_db && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: ENVIRONMENT
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 60
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: 7
+      - key: ALLOWED_ORIGINS
+        value: "https://inclusive-ats-frontend.onrender.com,http://localhost:3000,http://localhost:5173"
+      - key: MODEL_PATH
+        value: "app/ml/artifacts/model.pkl"
+      - key: DEVICE
+        value: "cpu"
+      - key: ENABLE_BIAS_MASKING
+        value: "true"
+      - key: DATABASE_URL
+        value: "sqlite:///./inclusive_ats.db"
+    disk:
+      name: ats-data
+      mountPath: /app/uploads
+      sizeGB: 1
+
+  # Frontend Static Site
+  - type: static
+    name: inclusive-ats-frontend
+    region: oregon
+    rootDir: frontend
+    buildCommand: "echo 'Frontend static assets ready'"
+    staticPublishPath: .
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: "https://inclusive-ats-backend.onrender.com/api/v1"

@@ -1,0 +1,6 @@
+
+    Summary: Experienced Engineer.
+    Experience: 5 years in Python and Docker.
+    Education: B.S. in Computer Science.
+    Skills: Python, Docker, SQL.
+    

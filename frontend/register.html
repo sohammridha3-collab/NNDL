@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Account | Inclusive Resume & Job Matching</title>
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/layout.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/pages.css">
+  <script src="env.js"></script>
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-card__header">
+        <a href="index.html" class="auth-card__logo" aria-label="Inclusive ATS Home">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4"/></svg>
+        </a>
+        <h1 class="auth-card__title">Create Account</h1>
+        <p class="auth-card__subtitle">Join the inclusive matching network</p>
+      </div>
+
+      <form id="register-form" novalidate>
+        <div class="field">
+          <label class="field__label" for="register-name">Full Name *</label>
+          <input class="input" type="text" id="register-name" name="full_name" required minlength="2" placeholder="e.g. Alex Morgan">
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="register-email">Email Address *</label>
+          <input class="input" type="email" id="register-email" name="email" required autocomplete="email" placeholder="name@domain.com">
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="register-password">Password (min 6 characters) *</label>
+          <div class="input-group">
+            <input class="input" type="password" id="register-password" name="password" required minlength="6" placeholder="••••••••">
+            <div class="input-group__trailing">
+              <button type="button" class="icon-btn password-toggle" aria-label="Show password">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="role-select">Account Purpose *</label>
+          <select class="select" id="role-select" name="role" required>
+            <option value="candidate" selected>Job Seeker / Candidate</option>
+            <option value="recruiter">Recruiter / Employer</option>
+          </select>
+        </div>
+
+        <div class="field" id="company-field" style="display: none;">
+          <label class="field__label" for="register-company">Company / Organization *</label>
+          <input class="input" type="text" id="register-company" name="company_name" placeholder="e.g. Tech Innovate Inc.">
+        </div>
+
+        <button id="register-submit" type="submit" class="btn btn--primary btn--block">Register & Access Workspace</button>
+      </form>
+
+      <div class="auth-card__footer">
+        Already registered? <a href="login.html">Sign in here</a>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="assets/js/pages/register.js"></script>
+</body>
+</html>
+

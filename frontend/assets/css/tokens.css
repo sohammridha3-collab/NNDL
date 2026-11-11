@@ -1,0 +1,211 @@
+/**
+ * Design Tokens — "Skills Connect to Opportunities"
+ * Inclusive Resume & Job Matching — UN SDG 10: Reduced Inequalities
+ * Palette: Midnight Navy (#070C18, #0E172B, #131E37), Ivory Typography (#F8FAFC, #CBD5E1),
+ *          Electric Teal Accents (#14B8A6, #2DD4BF, #00F2FE), Subtle AI Violet (#8B5CF6, #A78BFA)
+ */
+
+:root {
+  /* Color Palette — Midnight Navy Foundations (Default Theme) */
+  --bg-app: #070c18;
+  --bg-surface: #0e172b;
+  --bg-surface-elevated: #131e37;
+  --bg-subtle: #18233c;
+  --bg-muted: #223152;
+
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-default: rgba(255, 255, 255, 0.14);
+  --border-strong: rgba(255, 255, 255, 0.25);
+
+  /* Typography — Crisp Ivory & Soft Silver */
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-inverse: #070c18;
+
+  /* Brand Accents — Electric Teal & Cyan */
+  --color-primary: #14b8a6;
+  --color-primary-hover: #2dd4bf;
+  --color-primary-subtle: rgba(20, 184, 166, 0.12);
+  --color-primary-border: rgba(20, 184, 166, 0.35);
+  --color-primary-text: #5eead4;
+  --color-cyan: #00f2fe;
+
+  /* AI Feature Accents — Subtle Restrained Violet */
+  --color-ai: #8b5cf6;
+  --color-ai-hover: #a78bfa;
+  --color-ai-subtle: rgba(139, 92, 246, 0.14);
+  --color-ai-border: rgba(139, 92, 246, 0.35);
+  --color-ai-text: #c4b5fd;
+
+  /* Semantic Feedback */
+  --color-success: #10b981;
+  --color-success-subtle: rgba(16, 185, 129, 0.12);
+  --color-success-border: rgba(16, 185, 129, 0.35);
+  --color-success-text: #6ee7b7;
+
+  --color-warning: #f59e0b;
+  --color-warning-subtle: rgba(245, 158, 11, 0.12);
+  --color-warning-border: rgba(245, 158, 11, 0.35);
+  --color-warning-text: #fde68a;
+
+  --color-danger: #ef4444;
+  --color-danger-subtle: rgba(239, 68, 68, 0.12);
+  --color-danger-border: rgba(239, 68, 68, 0.35);
+  --color-danger-text: #fca5a5;
+
+  --color-info: #38bdf8;
+  --color-info-subtle: rgba(56, 189, 248, 0.12);
+  --color-info-border: rgba(56, 189, 248, 0.35);
+  --color-info-text: #7dd3fc;
+
+  /* Navigation / Shell Tokens */
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 76px;
+  --sidebar-bg: rgba(11, 19, 38, 0.85);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-text: #cbd5e1;
+  --sidebar-text-muted: #64748b;
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-active-bg: rgba(20, 184, 166, 0.16);
+  --sidebar-active-text: #5eead4;
+  --sidebar-active-border: #14b8a6;
+
+  --topbar-height: 64px;
+  --topbar-bg: rgba(7, 12, 24, 0.82);
+  --topbar-border: rgba(255, 255, 255, 0.08);
+
+  /* Glassmorphism & Depth Tokens */
+  --glass-bg: rgba(14, 23, 43, 0.75);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.09);
+  --glass-blur: blur(16px);
+  --perspective: 1200px;
+
+  /* Glow Filters & Accents */
+  --glow-teal: 0 0 24px rgba(20, 184, 166, 0.4);
+  --glow-teal-sm: 0 0 12px rgba(20, 184, 166, 0.25);
+  --glow-violet: 0 0 24px rgba(139, 92, 246, 0.35);
+  --glow-cyan: 0 0 24px rgba(0, 242, 254, 0.4);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 8px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.6), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 32px -6px rgba(0, 0, 0, 0.7), 0 8px 16px -6px rgba(0, 0, 0, 0.5);
+  --shadow-3d: 0 25px 50px -12px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.09);
+  --shadow-card: 0 8px 24px -4px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.08);
+
+  /* Typography */
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+  --font-size-xs: 0.75rem;     /* 12px */
+  --font-size-sm: 0.875rem;    /* 14px */
+  --font-size-base: 1rem;      /* 16px */
+  --font-size-lg: 1.125rem;    /* 18px */
+  --font-size-xl: 1.25rem;     /* 20px */
+  --font-size-2xl: 1.5rem;     /* 24px */
+  --font-size-3xl: 1.875rem;   /* 30px */
+  --font-size-4xl: 2.25rem;    /* 36px */
+  --font-size-5xl: 3rem;       /* 48px */
+  --font-size-6xl: 3.75rem;    /* 60px */
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.65;
+
+  /* Spacing */
+  --space-1: 0.25rem;   /* 4px */
+  --space-2: 0.5rem;    /* 8px */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-5: 1.25rem;   /* 20px */
+  --space-6: 1.5rem;    /* 24px */
+  --space-8: 2rem;      /* 32px */
+  --space-10: 2.5rem;   /* 40px */
+  --space-12: 3rem;     /* 48px */
+  --space-16: 4rem;     /* 64px */
+  --space-20: 5rem;     /* 80px */
+  --space-24: 6rem;     /* 96px */
+
+  /* Borders & Radii */
+  --radius-sm: 0.375rem; /* 6px */
+  --radius-md: 0.5rem;   /* 8px */
+  --radius-lg: 0.75rem;  /* 12px */
+  --radius-xl: 1rem;     /* 16px */
+  --radius-2xl: 1.25rem; /* 20px */
+  --radius-3xl: 1.75rem; /* 28px */
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+  /* Layout */
+  --max-width-content: 1320px;
+
+  /* Focus Ring */
+  --focus-ring: 0 0 0 2px #070c18, 0 0 0 4px #14b8a6;
+}
+
+/* Optional Light Mode Overrides */
+[data-theme="light"] {
+  --bg-app: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-subtle: #f1f5f9;
+  --bg-muted: #e2e8f0;
+
+  --border-subtle: #e2e8f0;
+  --border-default: #cbd5e1;
+  --border-strong: #94a3b8;
+
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --text-inverse: #ffffff;
+
+  --color-primary: #0d9488;
+  --color-primary-hover: #0f766e;
+  --color-primary-subtle: #f0fdfa;
+  --color-primary-border: #99f6e4;
+  --color-primary-text: #115e59;
+
+  --color-ai: #7c3aed;
+  --color-ai-hover: #6d28d9;
+  --color-ai-subtle: #f5f3ff;
+  --color-ai-border: #ddd6fe;
+  --color-ai-text: #5b21b6;
+
+  --sidebar-bg: #0f172a;
+  --sidebar-border: #1e293b;
+  --sidebar-text: #cbd5e1;
+  --sidebar-text-muted: #94a3b8;
+  --sidebar-hover: #1e293b;
+  --sidebar-active-bg: rgba(20, 184, 166, 0.15);
+  --sidebar-active-text: #2dd4bf;
+  --sidebar-active-border: #14b8a6;
+
+  --topbar-bg: rgba(255, 255, 255, 0.9);
+  --topbar-border: #e2e8f0;
+
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: 1px solid rgba(0, 0, 0, 0.08);
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+  --shadow-3d: 0 20px 35px -10px rgba(15, 23, 42, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  --shadow-card: 0 4px 12px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.05);
+
+  --focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px #0d9488;
+}

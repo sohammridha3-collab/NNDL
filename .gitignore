@@ -1,0 +1,19 @@
+# Python bytecode & cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Large datasets exceeding GitHub's 100 MB hard limit
+cv (1).csv
+
+# Local database backups and test databases
+*.db-journal
+test_*.db
+test_inclusive_ats.db
+

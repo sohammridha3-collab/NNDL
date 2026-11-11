@@ -1,0 +1,13 @@
+John Doe
+Senior Software Engineer
+Email: test@example.com Phone: +1-555-123-4567
+Summary:
+Experienced backend developer with 5+ years of experience in distributed systems.
+Skills:
+Python, Docker, SQL, Kubernetes, PyTorch, Machine Learning, Git, Linux, REST API
+Experience:
+Senior Developer at Acme Corp. Designed scalable microservices.
+Education:
+B.S. in Computer Science, University of Technology
+Projects:
+Built real-time ML inference platform.

@@ -1,0 +1,13 @@
+
+    Summary:
+    Experienced Machine Learning Engineer with strong background in NLP and Python.
+
+    Skills:
+    Python, PyTorch, SQL, Docker, AWS, Scikit-learn.
+
+    Experience:
+    Senior ML Engineer at AI Corp (2020-2024). Developed recommendation models and ATS parsers.
+
+    Education:
+    Bachelor of Science in Computer Science, State University.
+    

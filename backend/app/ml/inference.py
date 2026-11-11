@@ -1,0 +1,240 @@
+import logging
+import os
+import pickle
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+import numpy as np
+import torch
+from torch import nn
+
+from app.core.config import settings
+from app.ml.embeddings import EmbeddingEncoder
+from app.ml.preprocessing import clean, calculate_skill_overlap, DEFAULT_SKILLS
+
+logger = logging.getLogger("inclusive_ats.ml.inference")
+
+
+class MatchNetwork(nn.Module):
+    """
+    Trained PyTorch Neural Classifier Architecture.
+    Matches the exact architecture defined and trained in RESUME_AND_JOB.ipynb.
+    """
+    def __init__(self):
+        super().__init__()
+        self.layers = nn.Sequential(
+            nn.Linear(770, 256),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(256, 64),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(64, 1)
+        )
+
+    def forward(self, matrix: torch.Tensor) -> torch.Tensor:
+        return self.layers(matrix).squeeze(-1)
+
+
+class MLInferenceService:
+    """
+    Singleton ML Inference Service that loads the trained model bundle once,
+    manages the encoder and PyTorch classifier, and executes reproducible inference.
+    """
+    _instance: Optional["MLInferenceService"] = None
+
+    def __init__(self, model_path: Optional[str] = None):
+        self.device = settings.DEVICE
+        self.model_path = model_path or settings.MODEL_PATH
+        
+        # Verify model artifact exists
+        resolved_path = Path(self.model_path)
+        if not resolved_path.exists():
+            # Check alternative locations
+            candidates = [
+                Path("app/ml/artifacts/model.pkl"),
+                Path("backend/app/ml/artifacts/model.pkl"),
+                Path("model (1).pkl"),
+                Path("../model (1).pkl")
+            ]
+            for cand in candidates:
+                if cand.exists():
+                    resolved_path = cand
+                    break
+        
+        if not resolved_path.exists():
+            raise FileNotFoundError(
+                f"Trained model artifact not found at '{self.model_path}'. "
+                "Ensure model.pkl is placed in app/ml/artifacts/."
+            )
+
+        logger.info(f"Loading trained ML model bundle from '{resolved_path}'...")
+        with open(resolved_path, "rb") as f:
+            bundle = pickle.load(f)
+
+        self.model_type = bundle.get("model_type", "MiniLM + PyTorch MLP")
+        self.architecture = bundle.get("architecture", [770, 256, 64, 1])
+        self.threshold = float(bundle.get("threshold", 0.9032))
+        self.label_mapping = bundle.get("label_mapping", {0: "weaker match", 1: "strong match"})
+        self.chunk_tokens = int(bundle.get("chunk_tokens", 240))
+        self.vocabulary = bundle.get("skill_vocabulary", DEFAULT_SKILLS)
+        self.scaler = bundle.get("scaler")
+        
+        if self.scaler is None:
+            raise ValueError("StandardScaler missing from model bundle.")
+
+        # Reconstruct PyTorch MatchNetwork
+        self.model = MatchNetwork().to(self.device)
+        weights = bundle.get("weights", {})
+        state_dict = {k: torch.from_numpy(v).to(self.device) for k, v in weights.items()}
+        self.model.load_state_dict(state_dict)
+        self.model.eval()
+
+        # Initialize Embedding Encoder
+        encoder_name = bundle.get("encoder_name", settings.ENCODER_MODEL_NAME)
+        self.encoder = EmbeddingEncoder(
+            model_name=encoder_name,
+            device=self.device,
+            chunk_tokens=self.chunk_tokens
+        )
+        logger.info(
+            f"ML Inference Service successfully loaded! "
+            f"Threshold: {self.threshold:.4f}, Features: 770, Device: {self.device}"
+        )
+
+    @classmethod
+    def get_instance(cls) -> "MLInferenceService":
+        if cls._instance is None:
+            cls._instance = MLInferenceService()
+        return cls._instance
+
+    def build_features(
+        self,
+        resumes: List[str],
+        jobs: List[str],
+        mask: bool = True
+    ) -> np.ndarray:
+        """
+        Reconstructs the exact 770-dimensional feature vector:
+        1. Cosine similarity: (a * b).sum(axis=1, keepdims=True)  [dim 1]
+        2. Absolute difference: abs(a - b)                        [dim 384]
+        3. Element-wise product: a * b                            [dim 384]
+        4. Skill coverage ratio: coverage                         [dim 1]
+        Total = 770 dimensions.
+        """
+        if len(resumes) != len(jobs) or len(resumes) == 0:
+            raise ValueError("Provide equally sized, nonempty resume and job lists.")
+
+        resumes_clean = [clean(r, mask=mask) for r in resumes]
+        jobs_clean = [clean(j, mask=mask) for j in jobs]
+
+        # Generate 384-dimensional normalized embeddings
+        joined_embeddings = self.encoder.encode(resumes_clean + jobs_clean)
+        num_pairs = len(resumes)
+        a = joined_embeddings[:num_pairs]
+        b = joined_embeddings[num_pairs:]
+
+        # Skill coverage calculation
+        coverages = []
+        for r_text, j_text in zip(resumes_clean, jobs_clean):
+            _, _, cov = calculate_skill_overlap(r_text, j_text, self.vocabulary)
+            coverages.append(cov)
+        coverage_col = np.array(coverages, dtype=np.float32)[:, None]
+
+        # Construct 770-dim feature matrix
+        cosine_sim = (a * b).sum(axis=1, keepdims=True)
+        abs_diff = np.abs(a - b)
+        prod = a * b
+        
+        feature_matrix = np.concatenate([cosine_sim, abs_diff, prod, coverage_col], axis=1).astype(np.float32)
+        if feature_matrix.shape != (num_pairs, 770) or not np.isfinite(feature_matrix).all():
+            raise ValueError(f"Feature vector shape must be ({num_pairs}, 770) with all finite values.")
+
+        return feature_matrix
+
+    def predict_pair(
+        self,
+        resume_text: str,
+        job_text: str,
+        mask: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Executes real model inference on a single resume-job pair.
+        Returns full structured prediction with calibrated probabilities,
+        classifications, threshold, skills, and explainable metrics.
+        """
+        # Build 770-dim feature vector
+        feature_matrix = self.build_features([resume_text], [job_text], mask=mask)
+        
+        # Apply trained StandardScaler
+        scaled_matrix = self.scaler.transform(feature_matrix).astype(np.float32)
+        tensor_input = torch.from_numpy(scaled_matrix).to(self.device)
+
+        # PyTorch classifier inference
+        with torch.inference_mode():
+            logit = self.model(tensor_input)
+            probability = float(torch.sigmoid(logit).cpu().item())
+
+        # Skill extraction
+        clean_resume = clean(resume_text, mask=mask)
+        clean_job = clean(job_text, mask=mask)
+        matched_skills, missing_skills, coverage = calculate_skill_overlap(
+            clean_resume, clean_job, self.vocabulary
+        )
+
+        semantic_similarity = float(feature_matrix[0, 0])
+        is_strong_match = probability >= self.threshold
+        classification = "Strong Match" if is_strong_match else "Weaker Match"
+        score_pct = round(probability * 100, 2)
+
+        # Construct transparent, evidence-based recommendations
+        recommendations = []
+        if missing_skills:
+            top_missing = missing_skills[:4]
+            recommendations.append(
+                f"Consider demonstrating experience or certifications in required skills: {', '.join(top_missing)}."
+            )
+        if semantic_similarity < 0.6:
+            recommendations.append(
+                "Align your resume terminology and project descriptions more closely with the role requirements."
+            )
+        if is_strong_match:
+            recommendations.append(
+                "Profile strongly aligns with job expectations. Highlight your experience in " +
+                f"{', '.join(matched_skills[:3]) if matched_skills else 'key competencies'}."
+            )
+        else:
+            recommendations.append(
+                "Add quantified achievements and concrete project impacts matching the job responsibilities."
+            )
+
+        explanation = {
+            "model_architecture": "770-dim Multi-Feature Neural Classifier",
+            "decision_rule": f"Probability ({probability:.4f}) {'≥' if is_strong_match else '<'} Threshold ({self.threshold:.4f})",
+            "semantic_score_interpretation": (
+                "High semantic alignment" if semantic_similarity >= 0.75
+                else "Moderate semantic alignment" if semantic_similarity >= 0.55
+                else "Low semantic alignment"
+            ),
+            "skill_coverage_interpretation": (
+                f"{coverage * 100:.1f}% of recognized job skills identified in resume"
+                if (len(matched_skills) + len(missing_skills)) > 0
+                else "No skills from the recognized vocabulary were detected in the job text; coverage is not applicable"
+            ),
+            "total_job_skills_found": len(matched_skills) + len(missing_skills),
+            "bias_masking_applied": mask
+        }
+
+        return {
+            "compatibility_score": score_pct,
+            "raw_probability": probability,
+            "score_type": "model_probability_percent",
+            "classification": classification,
+            "decision_threshold": round(self.threshold, 4),
+            "semantic_similarity": round(semantic_similarity, 4),
+            "required_skill_coverage": round(coverage, 4),
+            "matched_skills": matched_skills,
+            "missing_skills": missing_skills,
+            "recommendations": recommendations,
+            "explanation": explanation,
+            "model_version": "MiniLM + PyTorch MLP v1.0"
+        }

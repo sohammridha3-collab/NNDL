@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inclusive Resume and Job Matching | UN SDG 10</title>
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/layout.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/pages.css">
+  <script src="env.js"></script>
+</head>
+<body>
+  <!-- Header / Navigation Bar -->
+  <header class="topbar">
+    <div class="topbar__left">
+      <a href="index.html" class="sidebar__brand-link">
+        <div class="sidebar__logo-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4"/></svg>
+        </div>
+        <span class="sidebar__brand-text">Inclusive ATS</span>
+      </a>
+    </div>
+    <div class="topbar__right">
+      <span id="backend-status" class="badge badge--neutral">Checking Status…</span>
+      <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme" type="button"></button>
+      <a href="login.html" class="btn btn--secondary btn--sm">Sign In</a>
+      <a href="register.html" class="btn btn--primary btn--sm">Get Started</a>
+    </div>
+  </header>
+
+  <!-- Main Hero Container -->
+  <main class="page-container">
+    <section class="hero-split">
+      <!-- Left Hero Column: Headline, Narrative, and Working Actions -->
+      <div class="hero-content">
+        <div class="hero-tag">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 7h14M5 7l-3 7a4 4 0 0 0 6 0zM19 7l-3 7a4 4 0 0 0 6 0zM8 21h8"/></svg>
+          <span>UN SDG 10: Reduced Inequalities</span>
+        </div>
+        <h1 class="hero-title">
+          Your skills. <br>
+          <span class="hero-title__highlight">Your next opportunity.</span>
+        </h1>
+        <p class="hero-subtitle">
+          Bridging the opportunity divide with deep neural text matching, automated demographic blindfolding, and transparent ATS skill alignment. We evaluate genuine candidate capabilities while screening out pedigree bias.
+        </p>
+        <div class="hero-actions">
+          <a href="match.html" class="btn btn--primary btn--lg">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+            Analyze My Resume
+          </a>
+          <a href="jobs.html" class="btn btn--secondary btn--lg">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            Browse Jobs
+          </a>
+        </div>
+        <div class="hero-metrics">
+          <div class="hero-metric-item">
+            <span class="hero-metric-item__value">770</span>
+            <span class="hero-metric-item__label">Neural Features</span>
+          </div>
+          <div class="hero-metric-item">
+            <span class="hero-metric-item__value">0.00 pts</span>
+            <span class="hero-metric-item__label">Demographic Parity Dev.</span>
+          </div>
+          <div class="hero-metric-item">
+            <span class="hero-metric-item__value">SentenceTransformers</span>
+            <span class="hero-metric-item__label">Vector Semantic Core</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Hero Column: 3D Artwork Stage ("Skills Connect to Opportunities") -->
+      <div class="hero-3d-stage" id="hero-3d-stage" aria-hidden="true">
+        <div class="hero-3d-scene" id="hero-3d-scene">
+          <!-- Animated Synapse Beams SVG Layer -->
+          <svg class="hero-3d__synapses" viewBox="0 0 380 440">
+            <defs>
+              <linearGradient id="synapseGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#14b8a6" stop-opacity="0.8" />
+                <stop offset="50%" stop-color="#00f2fe" stop-opacity="0.9" />
+                <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0.8" />
+              </linearGradient>
+            </defs>
+            <path class="synapse-line" d="M 140 120 Q 200 80, 270 180" />
+            <path class="synapse-line" d="M 160 210 Q 220 240, 260 290" />
+            <path class="synapse-line" d="M 120 300 Q 180 340, 240 330" />
+          </svg>
+
+          <!-- 3D Résumé Document Card -->
+          <div class="doc-3d-wrapper">
+            <div class="doc-scan-beam"></div>
+            <div class="doc-header">
+              <span class="doc-stamp">94% ATS Verified</span>
+              <span style="font-size: 0.65rem; color: var(--text-muted);">ID: #4092</span>
+            </div>
+            <div class="doc-name">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span>[BLINDED CANDIDATE]</span>
+            </div>
+            <div class="doc-role">Senior AI & Systems Engineer</div>
+            <div class="doc-bars">
+              <div class="doc-bar doc-bar--90"></div>
+              <div class="doc-bar doc-bar--70"></div>
+              <div class="doc-bar doc-bar--50"></div>
+            </div>
+            <div style="font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-top: 8px;">
+              Extracted Competencies
+            </div>
+            <div class="doc-skills-strip">
+              <span class="doc-skill-pill">PyTorch</span>
+              <span class="doc-skill-pill">FastAPI</span>
+              <span class="doc-skill-pill">NLP</span>
+              <span class="doc-skill-pill">PostgreSQL</span>
+              <span class="doc-skill-pill">Docker</span>
+              <span class="doc-skill-pill">Vectors</span>
+            </div>
+          </div>
+
+          <!-- 3D Target Job Card -->
+          <div class="job-3d-card">
+            <div class="job-3d-header">
+              <span class="badge badge--ai">Target Opportunity</span>
+              <span style="font-size: 0.7rem; color: #5eead4; font-weight: 700;">Verified</span>
+            </div>
+            <div class="job-3d-title">Senior AI Systems Engineer</div>
+            <div class="job-3d-company">EqualTech Labs • Remote (US/EU)</div>
+            <div class="job-3d-fit">
+              <span>Neural Match Score</span>
+              <span style="color: #00f2fe; font-size: 0.85rem; font-weight: 800;">96.2%</span>
+            </div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: var(--text-muted);">
+              8/9 required competencies verified
+            </div>
+          </div>
+
+          <!-- Floating Skill Nodes -->
+          <div class="skill-node-3d skill-node-3d--pytorch">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            <span>PyTorch</span>
+          </div>
+          <div class="skill-node-3d skill-node-3d--fastapi">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            <span>FastAPI</span>
+          </div>
+          <div class="skill-node-3d skill-node-3d--docker">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+            <span>Docker</span>
+          </div>
+          <div class="skill-node-3d skill-node-3d--vector">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/></svg>
+            <span>Vectors</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 Feature Cards -->
+    <section class="landing-features">
+      <div class="section-header">
+        <div class="section-header__tag">Architecture Highlights</div>
+        <h2 class="section-header__title">Engineered for Fairness and Precision</h2>
+        <p class="section-header__subtitle">A multi-stage pipeline designed to evaluate real technical merit and dismantle algorithmic discrimination.</p>
+      </div>
+
+      <div class="grid grid--cols-4">
+        <div class="feature-card">
+          <div class="feature-card__icon" style="background-color: var(--color-primary-subtle); color: var(--color-primary);">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4"/></svg>
+          </div>
+          <h3 class="feature-card__title">Demographic Blindfolding</h3>
+          <p class="feature-card__desc">
+            Personal identifiers (names, gender pronouns, contact addresses, institutional pedigrees) are neutralized before entering vector pipelines, ensuring decisions rest solely on demonstrated capabilities.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card__icon" style="background-color: var(--color-ai-subtle); color: var(--color-ai);">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+          </div>
+          <h3 class="feature-card__title">770-Feature Neural Classifier</h3>
+          <p class="feature-card__desc">
+            Combines dense SentenceTransformer embeddings, element-wise vectors, and canonical skill coverage into a trained PyTorch multilayer perceptron calibrated for precision and recall.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card__icon" style="background-color: var(--color-info-subtle); color: var(--color-info);">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 7h14M5 7l-3 7a4 4 0 0 0 6 0zM19 7l-3 7a4 4 0 0 0 6 0zM8 21h8"/></svg>
+          </div>
+          <h3 class="feature-card__title">Counterfactual Fairness Audit</h3>
+          <p class="feature-card__desc">
+            Synthetic variation testing checks model invariance across demographic profiles, proving score parity and guarding against algorithmic bias.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card__icon" style="background-color: var(--color-success-subtle); color: var(--color-success);">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></svg>
+          </div>
+          <h3 class="feature-card__title">Actionable Skill Gap Insights</h3>
+          <p class="feature-card__desc">
+            Provides candidates and recruiters with exact skill coverage percentages, matched requirements, and specific missing competencies for targeted upskilling.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3-Step Matching Workflow -->
+    <section class="workflow-section">
+      <div class="section-header">
+        <div class="section-header__tag">Transparent Workflow</div>
+        <h2 class="section-header__title">How Candidate Matching Works</h2>
+        <p class="section-header__subtitle">A clear three-stage process from document ingestion to calibrated recommendation.</p>
+      </div>
+
+      <div class="workflow-steps">
+        <div class="step-card">
+          <div class="step-number">1</div>
+          <h3 class="step-card__title">Ingestion & Privacy Sanitization</h3>
+          <p class="step-card__desc">
+            Resumes are parsed to extract structured skill ontologies and work experience. Sensitive demographic indicators are masked automatically to protect candidate privacy.
+          </p>
+        </div>
+
+        <div class="step-card">
+          <div class="step-number">2</div>
+          <h3 class="step-card__title">Semantic Vector Fusion</h3>
+          <p class="step-card__desc">
+            Deep SentenceTransformer embeddings encode contextual nuance, while canonical skill extractors quantify hard-skill overlap between resume competencies and job specifications.
+          </p>
+        </div>
+
+        <div class="step-card">
+          <div class="step-number">3</div>
+          <h3 class="step-card__title">Calibrated Scoring & Decision</h3>
+          <p class="step-card__desc">
+            The PyTorch MatchNetwork evaluates all 770 dimensions, outputting a strong-match compatibility score, semantic similarity ratio, and a complete skill breakdown.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SDG 10 Fairness & Parity Section -->
+    <section class="sdg-section">
+      <div class="sdg-banner">
+        <div style="display: flex; gap: var(--space-6); align-items: flex-start; flex-wrap: wrap;">
+          <div style="width: 52px; height: 52px; border-radius: var(--radius-2xl); background: var(--color-primary); color: #ffffff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: var(--glow-teal);">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 7h14M5 7l-3 7a4 4 0 0 0 6 0zM19 7l-3 7a4 4 0 0 0 6 0zM8 21h8"/></svg>
+          </div>
+          <div style="flex: 1; min-width: 280px;">
+            <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-2); flex-wrap: wrap;">
+              <span class="badge badge--success">SDG 10 Target 10.2</span>
+              <span class="badge badge--ai">Audited Invariance</span>
+            </div>
+            <h2 style="font-size: var(--font-size-2xl); margin-bottom: var(--space-3); color: #ffffff;">
+              Empirical Counterfactual Sensitivity Audit
+            </h2>
+            <p style="font-size: var(--font-size-sm); color: var(--text-secondary); line-height: var(--line-height-relaxed); margin-bottom: var(--space-4);">
+              We do not promise "bias-free" hiring, as real-world employment decisions involve complex human judgment. Instead, we provide <strong>auditable algorithmic invariance</strong>: when candidate demographic markers (names, gender pronouns, background indicators) are counterfactually perturbed while qualifications remain identical, our model delivers verified 0.00-point deviation and a 0.0% decision flip rate.
+            </p>
+            <div style="display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap;">
+              <a href="fairness.html" class="btn btn--secondary btn--sm">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+                View Live Audit Reports
+              </a>
+              <span style="font-size: var(--font-size-xs); color: var(--text-muted);">
+                Benchmark: 72 synthetic perturbation pairs tested against baseline
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer style="border-top: 1px solid var(--border-subtle); padding: var(--space-10) 0; margin-top: var(--space-8); text-align: center; font-size: var(--font-size-sm); color: var(--text-muted);">
+      <p style="font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-1);">
+        Inclusive Resume and Job Matching System • UN SDG 10: Reduced Inequalities
+      </p>
+      <p style="font-size: var(--font-size-xs);">
+        FastAPI Backend (8001) • PyTorch MatchNetwork (770 Features) • SentenceTransformers (all-MiniLM-L6-v2) • Vanilla ES Modules
+      </p>
+    </footer>
+  </main>
+
+  <script type="module" src="assets/js/pages/landing.js"></script>
+</body>
+</html>

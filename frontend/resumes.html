@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resume Management | Inclusive ATS</title>
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/layout.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/pages.css">
+  <script src="env.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <div id="drawer-backdrop" class="drawer-backdrop"></div>
+
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar__brand">
+        <a href="index.html" class="sidebar__brand-link">
+          <div class="sidebar__logo-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4"/></svg>
+          </div>
+          <span class="sidebar__brand-text">Inclusive ATS</span>
+        </a>
+      </div>
+
+      <nav id="sidebar-nav" class="sidebar__nav" aria-label="Main Navigation"></nav>
+
+      <div class="sidebar__footer">
+        <button id="logout-btn" class="sidebar__link" style="border: none; background: transparent; width: 100%; cursor: pointer;" type="button">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          <span>Sign Out</span>
+        </button>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="topbar">
+        <div class="topbar__left">
+          <button id="mobile-menu-toggle" class="icon-btn topbar__mobile-toggle" aria-label="Open navigation menu" aria-expanded="false" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+          </button>
+          <div id="breadcrumbs"></div>
+        </div>
+        <div class="topbar__right">
+          <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme" type="button"></button>
+          <div class="user-pill">
+            <div class="user-pill__avatar">C</div>
+            <span id="topbar-user-name" class="user-pill__name">Candidate</span>
+          </div>
+        </div>
+      </header>
+
+      <main class="page-container">
+        <div class="page-header">
+          <div class="page-header__content">
+            <h1 class="page-header__title">Resume Management</h1>
+            <p class="page-header__subtitle">Upload, parse, and verify ATS readiness across multiple versions of your resume</p>
+          </div>
+        </div>
+
+        <!-- Upload Dropzone -->
+        <div class="card" style="margin-bottom: var(--space-8);">
+          <div id="resume-dropzone" class="dropzone" tabindex="0" role="button" aria-label="Upload resume file">
+            <input type="file" id="resume-file-input" accept=".pdf,.docx,.txt" style="display: none;" aria-hidden="true">
+            <div class="dropzone__icon">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+            </div>
+            <div class="dropzone__title">Drag & drop your resume file, or click to browse</div>
+            <div class="dropzone__desc">Our parser automatically extracts technical skills, identifies critical sections, and scores ATS readability.</div>
+            <div class="dropzone__formats">Supported formats: PDF, DOCX, TXT • Maximum file size: 10MB</div>
+          </div>
+
+          <!-- Upload Progress indicator -->
+          <div id="upload-progress-container" style="display: none; margin-top: var(--space-4);">
+            <div style="display: flex; justify-content: space-between; font-size: var(--font-size-xs); color: var(--text-muted); margin-bottom: var(--space-1);">
+              <span id="upload-progress-text">Uploading document…</span>
+            </div>
+            <div style="height: 6px; background: var(--bg-subtle); border-radius: var(--radius-full); overflow: hidden;">
+              <div id="upload-progress-bar" style="height: 100%; width: 0%; background: var(--color-primary); transition: width 0.2s ease;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Uploaded Resumes List Section -->
+        <div style="margin-bottom: var(--space-4); display: flex; justify-content: space-between; align-items: center;">
+          <h2 style="font-size: var(--font-size-xl);">Uploaded Resumes</h2>
+          <span style="font-size: var(--font-size-xs); color: var(--text-muted);">The latest active resume is automatically used for AI job recommendations</span>
+        </div>
+
+        <div id="resumes-list-container"></div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module" src="assets/js/pages/resumes.js"></script>
+</body>
+</html>
+
