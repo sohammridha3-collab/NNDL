@@ -95,18 +95,13 @@ def main():
     print("  -> Frontend Application:   http://127.0.0.1:5500/frontend/ (or index.html)")
     print("=" * 76 + "\n")
 
-    try:
-        from app.main import app
-        app_target = app
-    except ImportError:
-        app_target = "app.main:app"
-
     uvicorn.run(
-        app_target,
+        "app.main:app",
         host=host,
         port=port,
+        reload=False,
         log_level="info",
-        app_dir=str(BACKEND_DIR) if isinstance(app_target, str) else None
+        app_dir=str(BACKEND_DIR)
     )
 
 
