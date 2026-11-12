@@ -10,7 +10,7 @@ if str(backend_dir) not in sys.path:
 
 import uvicorn
 
-def get_available_port(default_port: int = 8000, host: str = "127.0.0.1") -> int:
+def get_available_port(default_port: int = 8001, host: str = "127.0.0.1") -> int:
     env_p = os.getenv("PORT")
     if env_p and env_p.isdigit():
         return int(env_p)
@@ -25,7 +25,7 @@ def get_available_port(default_port: int = 8000, host: str = "127.0.0.1") -> int
 
 if __name__ == "__main__":
     host = "127.0.0.1"
-    port = get_available_port(8000, host)
+    port = get_available_port(8001, host)
 
     print("\n" + "=" * 70)
     print(" >>> Inclusive Resume & Job Matching API is starting up... <<<")

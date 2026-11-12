@@ -6,6 +6,7 @@ backend_dir = Path(__file__).resolve().parent.parent
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
+import threading
 from contextlib import asynccontextmanager
 import logging
 from fastapi import FastAPI, Request, status
@@ -32,13 +33,16 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Database schema initialization error: {e}")
 
-    # Startup: Warm up ML Model
-    logger.info("Pre-warming ML Inference Service and Sentence Transformer...")
-    try:
-        ml_service = MLInferenceService.get_instance()
-        logger.info(f"Model initialized: {ml_service.model_type} (Threshold: {ml_service.threshold})")
-    except Exception as e:
-        logger.warning(f"Could not pre-warm ML model on startup: {e}")
+    # Startup: Warm up ML Model in background thread so server port opens immediately
+    def _warmup_ml():
+        logger.info("Pre-warming ML Inference Service and Sentence Transformer...")
+        try:
+            ml_service = MLInferenceService.get_instance()
+            logger.info(f"Model initialized: {ml_service.model_type} (Threshold: {ml_service.threshold})")
+        except Exception as e:
+            logger.warning(f"Could not pre-warm ML model on startup: {e}")
+
+    threading.Thread(target=_warmup_ml, daemon=True, name="ML-Warmup").start()
 
     yield
 
