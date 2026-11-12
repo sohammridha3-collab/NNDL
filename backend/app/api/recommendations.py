@@ -2,12 +2,54 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_role
+from app.api.deps import get_current_user, get_optional_user, require_role
 from app.db.session import get_db
 from app.models.models import Job, Resume, User
+from app.schemas.schemas import (
+    SkillExtractionRequest,
+    SkillExtractionResponse,
+    SkillRecommendationRequest,
+    SkillRecommendationResponse
+)
 from app.services.recommendation_service import RecommendationService
 
 router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
+
+
+@router.post("/skills", response_model=SkillRecommendationResponse)
+def get_recommendations_by_skills(
+    request: SkillRecommendationRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Skill-based job recommendation engine.
+    - Evaluates entered skill chips or extracts from selected résumé.
+    - Connects curated database listings and authorized live vacancies (Adzuna / Remotive).
+    - Distinguishes Skills-Only Relevance vs. Full Neural Résumé Match Fit.
+    """
+    return RecommendationService.recommend_jobs_by_skills(
+        db=db,
+        req=request,
+        current_user=current_user
+    )
+
+
+@router.post("/extract-skills", response_model=SkillExtractionResponse)
+def extract_skills_from_resume(
+    request: SkillExtractionRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Extracts canonical skill tags from an existing stored resume or direct pasted text.
+    Allows candidates to review, add, edit, and remove skills as interactive chips.
+    """
+    return RecommendationService.extract_skills_from_input(
+        db=db,
+        request=request,
+        current_user=current_user
+    )
 
 
 @router.get("/jobs")

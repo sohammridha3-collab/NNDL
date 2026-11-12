@@ -1,5 +1,7 @@
 /**
- * Job Search & Exploration Controller
+ * Job Opportunities & Skill-Based Discovery Controller
+ * Integrates dual-source recommendations (Curated Dataset & Live Vacancies)
+ * with interactive editable skill chips, résumé extraction, and ML reranking.
  */
 import { Api } from "../api.js";
 import { session } from "../session.js";
@@ -11,6 +13,7 @@ import {
   icon,
   badge,
   chip,
+  classificationBadge,
   fmtDate,
   fmtSalary,
   loadingState,
@@ -23,7 +26,24 @@ import {
   debounce
 } from "../ui.js";
 
-let currentFilter = {
+// Active view mode: "recommendations" or "catalog"
+let currentMode = "recommendations";
+
+// Skill-Based Recommendations Filter State
+let skillFilter = {
+  skills: ["Python", "SQL", "Docker", "Machine Learning"],
+  resume_id: "",
+  location: "",
+  job_type: "",
+  experience_level: "",
+  category: "",
+  include_external: true,
+  limit: 12,
+  offset: 0
+};
+
+// All Jobs Catalog Filter State
+let catalogFilter = {
   q: "",
   category: "",
   job_type: "",
@@ -35,9 +55,9 @@ let currentFilter = {
 
 let currentUser = null;
 let savedJobIds = new Set();
+let userResumes = [];
 
 document.addEventListener("DOMContentLoaded", async () => {
-  // Can be viewed when signed in or publicly
   if (session.isSignedIn()) {
     try {
       currentUser = await Api.auth.me();
@@ -50,437 +70,748 @@ document.addEventListener("DOMContentLoaded", async () => {
   initAppShell({
     user: currentUser,
     activePage: "jobs.html",
-    breadcrumbs: [{ label: "Workspace" }, { label: "Browse Jobs" }]
+    breadcrumbs: [{ label: "Workspace" }, { label: "Job Opportunities" }]
   });
 
-  setupFilters();
+  setupModeSwitcher();
+  setupSkillChips();
+  setupRecommendationsControls();
+  setupCatalogControls();
+
+  await loadUserResumes();
   await loadSavedJobs();
-  loadJobs();
+
+  // Load initial recommendations
+  loadSkillRecommendations();
 });
 
-function setupFilters() {
-  const searchInput = $("#job-search-input");
-  const categorySelect = $("#job-category-select");
-  const typeSelect = $("#job-type-select");
-  const sortSelect = $("#job-sort-select");
-  const clearBtn = $("#clear-filters-btn");
+/* ==============================================================================
+ * Mode Switcher (Recommendations vs All Jobs Catalog)
+ * ============================================================================== */
+function setupModeSwitcher() {
+  const recTabBtn = $("#tab-recommendations-btn");
+  const catTabBtn = $("#tab-catalog-btn");
+  const recPanel = $("#recommendations-panel");
+  const catPanel = $("#catalog-panel");
+  const resultsTitle = $("#results-title");
+  const resultsSubtitle = $("#results-subtitle");
 
-  if (searchInput) {
-    searchInput.addEventListener("input", debounce(() => {
-      currentFilter.q = searchInput.value.trim();
-      currentFilter.offset = 0;
-      loadJobs();
-    }, 350));
-  }
+  recTabBtn?.addEventListener("click", () => {
+    currentMode = "recommendations";
+    recTabBtn.className = "btn btn--sm btn--primary";
+    recTabBtn.setAttribute("aria-selected", "true");
+    catTabBtn.className = "btn btn--sm btn--ghost";
+    catTabBtn.setAttribute("aria-selected", "false");
 
-  if (categorySelect) {
-    categorySelect.addEventListener("change", () => {
-      currentFilter.category = categorySelect.value;
-      currentFilter.offset = 0;
-      loadJobs();
-    });
-  }
+    if (recPanel) recPanel.style.display = "block";
+    if (catPanel) catPanel.style.display = "none";
+    if (resultsTitle) resultsTitle.textContent = "Recommended Opportunities";
+    if (resultsSubtitle) resultsSubtitle.textContent = "Ranked by semantic alignment and skill coverage";
 
-  if (typeSelect) {
-    typeSelect.addEventListener("change", () => {
-      currentFilter.job_type = typeSelect.value;
-      currentFilter.offset = 0;
-      loadJobs();
-    });
-  }
+    loadSkillRecommendations();
+  });
 
-  if (sortSelect) {
-    sortSelect.addEventListener("change", () => {
-      currentFilter.sort = sortSelect.value;
-      currentFilter.offset = 0;
-      loadJobs();
-    });
-  }
+  catTabBtn?.addEventListener("click", () => {
+    currentMode = "catalog";
+    catTabBtn.className = "btn btn--sm btn--primary";
+    catTabBtn.setAttribute("aria-selected", "true");
+    recTabBtn.className = "btn btn--sm btn--ghost";
+    recTabBtn.setAttribute("aria-selected", "false");
 
-  if (clearBtn) {
-    clearBtn.addEventListener("click", () => {
-      resetFilters();
-    });
-  }
+    if (recPanel) recPanel.style.display = "none";
+    if (catPanel) catPanel.style.display = "block";
+    if (resultsTitle) resultsTitle.textContent = "All Jobs Catalog";
+    if (resultsSubtitle) resultsSubtitle.textContent = "Browse verified database postings";
+
+    loadCatalogJobs();
+  });
 }
 
-function resetFilters() {
-  currentFilter.q = "";
-  currentFilter.category = "";
-  currentFilter.job_type = "";
-  currentFilter.sort = "newest";
-  currentFilter.offset = 0;
+/* ==============================================================================
+ * Interactive Editable Skill Chips
+ * ============================================================================== */
+function setupSkillChips() {
+  const chipInput = $("#skill-chip-input");
 
-  const searchInput = $("#job-search-input");
-  const categorySelect = $("#job-category-select");
-  const typeSelect = $("#job-type-select");
-  const sortSelect = $("#job-sort-select");
+  renderSkillChips();
 
-  if (searchInput) searchInput.value = "";
-  if (categorySelect) categorySelect.value = "";
-  if (typeSelect) typeSelect.value = "";
-  if (sortSelect) sortSelect.value = "newest";
+  chipInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      const val = chipInput.value.trim().replace(/^,+|,+$/g, "");
+      if (val) {
+        addSkill(val);
+        chipInput.value = "";
+      }
+    } else if (e.key === "Backspace" && !chipInput.value && skillFilter.skills.length > 0) {
+      removeSkill(skillFilter.skills[skillFilter.skills.length - 1]);
+    }
+  });
 
-  updateFilterBarUI([]);
-  loadJobs();
+  // Suggestion buttons
+  $$("[data-add-skill]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const skillName = btn.getAttribute("data-add-skill");
+      if (skillName) addSkill(skillName);
+    });
+  });
 }
 
-function updateFilterBarUI(jobs = []) {
-  const clearBtn = $("#clear-filters-btn");
-  const statusText = $("#filter-status-text");
+function renderSkillChips() {
+  const container = $("#skill-chips-box");
+  const chipInput = $("#skill-chip-input");
+  const countBadge = $("#skill-count-badge");
+  if (!container || !chipInput) return;
 
-  const hasFilter = Boolean(currentFilter.q || currentFilter.category || currentFilter.job_type || currentFilter.sort !== "newest");
+  // Clear existing rendered chips except the text input
+  Array.from(container.children).forEach((child) => {
+    if (child !== chipInput) child.remove();
+  });
 
-  if (clearBtn) {
-    clearBtn.style.display = hasFilter ? "inline-flex" : "none";
-  }
-
-  if (statusText) {
-    const pageNum = Math.floor(currentFilter.offset / currentFilter.limit) + 1;
-    const parts = [];
-    if (currentFilter.q) parts.push(`keyword "${currentFilter.q}"`);
-    if (currentFilter.category) parts.push(`category "${currentFilter.category}"`);
-    if (currentFilter.job_type) parts.push(`type "${currentFilter.job_type}"`);
-    if (currentFilter.sort !== "newest") parts.push(`sort: ${currentFilter.sort}`);
-
-    const filterDesc = parts.length > 0 ? ` [Filtered by ${parts.join(", ")}]` : "";
-    const countDesc = jobs.length === 0 
-      ? `0 jobs found${filterDesc}`
-      : `Showing ${jobs.length} jobs (Page ${pageNum})${filterDesc}`;
-    statusText.textContent = countDesc;
-  }
-}
-
-async function loadSavedJobs() {
-  if (!currentUser) return;
-  try {
-    const saved = await Api.jobs.saved();
-    savedJobIds = new Set((saved || []).map((j) => j.id));
-  } catch {
-    savedJobIds = new Set();
-  }
-}
-
-async function loadJobs() {
-  const container = $("#jobs-grid-container");
-  if (!container) return;
-
-  container.replaceChildren(loadingState("Searching available job openings…"));
-
-  try {
-    const jobs = await Api.jobs.list(currentFilter);
-    updateFilterBarUI(jobs);
-    renderJobsGrid(container, jobs);
-    renderPagination(jobs.length);
-  } catch (err) {
-    updateFilterBarUI([]);
-    renderPagination(0);
-    container.replaceChildren(
-      errorState(err, {
-        title: "Could not load jobs from server",
-        message: (err.kind === "unavailable" || err.status === 0)
-          ? "Unable to reach the backend at http://127.0.0.1:8001. Please verify that the API server is active."
-          : (err.message || "An unexpected error occurred while fetching jobs."),
-        onRetry: () => loadJobs()
-      })
+  skillFilter.skills.forEach((skill) => {
+    const chipEl = h("span", {
+      class: "chip chip--accent",
+      style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "6px",
+        padding: "3px 10px",
+        borderRadius: "var(--radius-full)",
+        background: "rgba(20, 184, 166, 0.15)",
+        border: "1px solid rgba(20, 184, 166, 0.4)",
+        color: "var(--color-primary)",
+        fontSize: "12px",
+        fontWeight: "500"
+      }
+    },
+      document.createTextNode(skill),
+      h("button", {
+        type: "button",
+        "aria-label": `Remove ${skill}`,
+        style: {
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          padding: "0",
+          color: "var(--color-primary)",
+          display: "flex",
+          alignItems: "center",
+          fontSize: "14px",
+          lineHeight: "1"
+        },
+        onclick: (e) => {
+          e.stopPropagation();
+          removeSkill(skill);
+        }
+      }, "×")
     );
+    container.insertBefore(chipEl, chipInput);
+  });
+
+  if (countBadge) {
+    countBadge.textContent = `${skillFilter.skills.length} ${skillFilter.skills.length === 1 ? "skill" : "skills"}`;
   }
 }
 
-function renderJobsGrid(container, jobs) {
-  container.replaceChildren();
+function addSkill(name) {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  const exists = skillFilter.skills.some((s) => s.toLowerCase() === trimmed.toLowerCase());
+  if (!exists) {
+    skillFilter.skills.push(trimmed);
+    renderSkillChips();
+  }
+}
 
-  if (!jobs || jobs.length === 0) {
-    const hasFilter = Boolean(currentFilter.q || currentFilter.category || currentFilter.job_type || currentFilter.sort !== "newest");
-    container.appendChild(
-      emptyState({
-        title: hasFilter ? "No jobs match your filter criteria" : "No job openings available",
-        message: hasFilter
-          ? "No jobs matched the selected keywords or filter parameters. Try clicking 'Clear Filters' to view all postings."
-          : "Check back soon for new openings from our inclusive employer partners.",
-        iconName: "briefcase",
-        action: hasFilter
-          ? h("button", {
-              class: "btn btn--secondary btn--sm",
-              onclick: () => resetFilters()
-            }, icon("refresh", { size: 14 }), " Reset Filters")
-          : null
-      })
-    );
+function removeSkill(name) {
+  skillFilter.skills = skillFilter.skills.filter((s) => s.toLowerCase() !== name.toLowerCase());
+  renderSkillChips();
+}
+
+/* ==============================================================================
+ * Résumé Extraction & Recommendations Controls
+ * ============================================================================== */
+async function loadUserResumes() {
+  const select = $("#rec-resume-select");
+  if (!select) return;
+
+  if (!session.isSignedIn()) {
+    select.replaceChildren(h("option", { value: "" }, "Sign in to extract from stored résumé"));
     return;
   }
 
-  const grid = h("div", { class: "grid grid--cards" });
+  try {
+    userResumes = await Api.resumes.list();
+    if (userResumes.length > 0) {
+      select.replaceChildren(
+        h("option", { value: "" }, "— Choose a stored résumé —"),
+        ...userResumes.map((r) => h("option", { value: r.id, selected: r.is_active }, `${r.file_name} (${r.ats_score}% ATS)`))
+      );
+      // If there's an active resume, pre-select it
+      const active = userResumes.find((r) => r.is_active);
+      if (active) skillFilter.resume_id = active.id;
+    } else {
+      select.replaceChildren(h("option", { value: "" }, "No saved résumés found (add skills above)"));
+    }
+  } catch {
+    select.replaceChildren(h("option", { value: "" }, "Unable to load saved résumés"));
+  }
+}
+
+function setupRecommendationsControls() {
+  const findBtn = $("#find-matches-btn");
+  const resetBtn = $("#reset-recommendations-btn");
+  const extractBtn = $("#extract-skills-btn");
+  const resumeSelect = $("#rec-resume-select");
+  const locInput = $("#rec-location-input");
+  const arrSelect = $("#rec-arrangement-select");
+  const expSelect = $("#rec-experience-select");
+  const catSelect = $("#rec-category-select");
+  const extCheck = $("#include-external-checkbox");
+
+  resumeSelect?.addEventListener("change", () => {
+    skillFilter.resume_id = resumeSelect.value;
+  });
+
+  extractBtn?.addEventListener("click", async () => {
+    const resumeId = resumeSelect?.value || skillFilter.resume_id;
+    if (!resumeId) {
+      toast("Please select a stored résumé first to extract skills.", { type: "info" });
+      return;
+    }
+    setBusy(extractBtn, true, "Extracting…");
+    try {
+      const res = await Api.recommendations.extractSkills({ resume_id: resumeId });
+      if (res.skills && res.skills.length > 0) {
+        res.skills.forEach((s) => addSkill(s));
+        toast(`Extracted ${res.count} canonical skills from résumé!`, { type: "success" });
+      } else {
+        toast("No recognizable technical skills found in this résumé.", { type: "info" });
+      }
+    } catch (err) {
+      toast(errorMessage(err, "Failed to extract skills from résumé."), { type: "error" });
+    } finally {
+      setBusy(extractBtn, false);
+    }
+  });
+
+  findBtn?.addEventListener("click", () => {
+    skillFilter.location = locInput ? locInput.value.trim() : "";
+    skillFilter.job_type = arrSelect ? arrSelect.value : "";
+    skillFilter.experience_level = expSelect ? expSelect.value : "";
+    skillFilter.category = catSelect ? catSelect.value : "";
+    skillFilter.include_external = extCheck ? extCheck.checked : true;
+    skillFilter.offset = 0;
+    loadSkillRecommendations();
+  });
+
+  resetBtn?.addEventListener("click", () => {
+    skillFilter.skills = ["Python", "SQL", "Docker", "Machine Learning"];
+    skillFilter.resume_id = "";
+    skillFilter.location = "";
+    skillFilter.job_type = "";
+    skillFilter.experience_level = "";
+    skillFilter.category = "";
+    skillFilter.include_external = true;
+    skillFilter.offset = 0;
+
+    renderSkillChips();
+    if (locInput) locInput.value = "";
+    if (arrSelect) arrSelect.value = "";
+    if (expSelect) expSelect.value = "";
+    if (catSelect) catSelect.value = "";
+    if (extCheck) extCheck.checked = true;
+    if (resumeSelect) resumeSelect.value = "";
+
+    loadSkillRecommendations();
+  });
+}
+
+/* ==============================================================================
+ * Load Skill-Based Recommendations
+ * ============================================================================== */
+async function loadSkillRecommendations() {
+  const container = $("#jobs-grid-container");
+  const paginationContainer = $("#jobs-pagination-container");
+  const countBadge = $("#results-count-badge");
+  const apiBadge = $("#external-api-badge");
+  if (!container) return;
+
+  container.replaceChildren(loadingState("Matching opportunities against canonical skills & neural embeddings…"));
+
+  try {
+    const payload = {
+      skills: skillFilter.skills,
+      resume_id: skillFilter.resume_id || undefined,
+      location: skillFilter.location || undefined,
+      job_type: skillFilter.job_type || undefined,
+      experience_level: skillFilter.experience_level || undefined,
+      category: skillFilter.category || undefined,
+      include_external: skillFilter.include_external,
+      limit: skillFilter.limit,
+      offset: skillFilter.offset
+    };
+
+    const res = await Api.recommendations.bySkills(payload);
+
+    // Update API provider badge
+    if (apiBadge && res.api_status) {
+      if (res.api_status.configured) {
+        apiBadge.className = "badge badge--success";
+        apiBadge.textContent = "Live Vacancies: Adzuna Connected";
+      } else {
+        apiBadge.className = "badge badge--neutral";
+        apiBadge.textContent = "Live Vacancies: Remotive / Database";
+      }
+      apiBadge.title = res.api_status.message || "";
+    }
+
+    if (countBadge) {
+      countBadge.textContent = `${res.total} ${res.total === 1 ? "listing" : "listings"} found`;
+    }
+
+    if (!res.items || res.items.length === 0) {
+      container.replaceChildren(
+        emptyState("No matching vacancies found for these skills and filters. Try adding more skills or broadening location.")
+      );
+      if (paginationContainer) paginationContainer.replaceChildren();
+      return;
+    }
+
+    renderJobCards(container, res.items, true);
+    renderPagination(paginationContainer, res.total, skillFilter.limit, skillFilter.offset, (newOffset) => {
+      skillFilter.offset = newOffset;
+      loadSkillRecommendations();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  } catch (err) {
+    container.replaceChildren(
+      errorState("Failed to retrieve skill recommendations. Please check server connectivity.", () => loadSkillRecommendations())
+    );
+  }
+}
+
+/* ==============================================================================
+ * All Jobs Catalog Controller
+ * ============================================================================== */
+function setupCatalogControls() {
+  const searchInput = $("#job-search-input");
+  const categorySelect = $("#job-category-select");
+  const typeSelect = $("#job-type-select");
+  const sortSelect = $("#job-sort-select");
+  const clearBtn = $("#clear-filters-btn");
+
+  searchInput?.addEventListener("input", debounce(() => {
+    catalogFilter.q = searchInput.value.trim();
+    catalogFilter.offset = 0;
+    loadCatalogJobs();
+  }, 350));
+
+  categorySelect?.addEventListener("change", () => {
+    catalogFilter.category = categorySelect.value;
+    catalogFilter.offset = 0;
+    loadCatalogJobs();
+  });
+
+  typeSelect?.addEventListener("change", () => {
+    catalogFilter.job_type = typeSelect.value;
+    catalogFilter.offset = 0;
+    loadCatalogJobs();
+  });
+
+  sortSelect?.addEventListener("change", () => {
+    catalogFilter.sort = sortSelect.value;
+    catalogFilter.offset = 0;
+    loadCatalogJobs();
+  });
+
+  clearBtn?.addEventListener("click", () => {
+    catalogFilter.q = "";
+    catalogFilter.category = "";
+    catalogFilter.job_type = "";
+    catalogFilter.sort = "newest";
+    catalogFilter.offset = 0;
+
+    if (searchInput) searchInput.value = "";
+    if (categorySelect) categorySelect.value = "";
+    if (typeSelect) typeSelect.value = "";
+    if (sortSelect) sortSelect.value = "newest";
+    if (clearBtn) clearBtn.style.display = "none";
+
+    loadCatalogJobs();
+  });
+}
+
+async function loadCatalogJobs() {
+  const container = $("#jobs-grid-container");
+  const paginationContainer = $("#jobs-pagination-container");
+  const countBadge = $("#results-count-badge");
+  const clearBtn = $("#clear-filters-btn");
+  if (!container) return;
+
+  const hasFilters = Boolean(catalogFilter.q || catalogFilter.category || catalogFilter.job_type || catalogFilter.sort !== "newest");
+  if (clearBtn) clearBtn.style.display = hasFilters ? "inline-flex" : "none";
+
+  container.replaceChildren(loadingState("Loading opportunities from database…"));
+
+  try {
+    const jobs = await Api.jobs.list({
+      q: catalogFilter.q || undefined,
+      category: catalogFilter.category || undefined,
+      job_type: catalogFilter.job_type || undefined,
+      sort: catalogFilter.sort,
+      limit: catalogFilter.limit,
+      offset: catalogFilter.offset
+    });
+
+    if (countBadge) {
+      countBadge.textContent = `${jobs.length} postings displayed`;
+    }
+
+    if (!jobs || jobs.length === 0) {
+      container.replaceChildren(
+        emptyState("No job postings matched your search criteria.", () => {
+          if (clearBtn) clearBtn.click();
+        })
+      );
+      if (paginationContainer) paginationContainer.replaceChildren();
+      return;
+    }
+
+    renderJobCards(container, jobs, false);
+    if (paginationContainer) paginationContainer.replaceChildren();
+  } catch (err) {
+    container.replaceChildren(
+      errorState("Failed to load jobs from catalog.", () => loadCatalogJobs())
+    );
+  }
+}
+
+/* ==============================================================================
+ * Unified Job Card Rendering
+ * ============================================================================== */
+function renderJobCards(container, jobs, isRecommendationMode = false) {
+  const grid = h("div", { class: "grid grid--cols-3", style: { gap: "var(--space-4)" } });
 
   jobs.forEach((j) => {
-    const isSaved = savedJobIds.has(j.id);
-    const card = h("div", { class: "card", style: { display: "flex", flexDirection: "column", height: "100%" } },
-      // Header
-      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-2)", marginBottom: "var(--space-2)" } },
-        h("div", {},
-          h("h3", { style: { fontSize: "var(--font-size-base)", fontWeight: "var(--font-weight-semibold)", marginBottom: "var(--space-1)" }, text: j.title }),
-          h("p", { style: { fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }, text: j.company_name })
-        ),
-        currentUser && currentUser.role === "candidate"
-          ? h("button", {
-              class: "icon-btn",
-              title: isSaved ? "Remove from bookmarks" : "Save job",
-              "aria-label": isSaved ? "Remove from bookmarks" : "Save job",
+    const isSaved = savedJobIds.has(j.id) || j.is_saved;
+    const isExternal = j.source_type === "live_vacancy" || (j.id && (j.id.startsWith("adzuna_") || j.id.startsWith("remotive_")));
+
+    // Source Badge
+    const sourceBadge = isExternal
+      ? h("span", { class: "badge badge--accent", style: { fontSize: "11px", fontWeight: "600" } },
+          icon("globe", { size: 12 }),
+          document.createTextNode(` ${j.source_label || "Live Vacancy"}`)
+        )
+      : h("span", { class: "badge badge--neutral", style: { fontSize: "11px" } },
+          icon("database", { size: 12 }),
+          document.createTextNode(" Curated Dataset")
+        );
+
+    // Score Badge (for recommendations)
+    let scoreBadgeEl = null;
+    if (isRecommendationMode && j.score !== undefined) {
+      const isStrong = /strong|high/i.test(j.classification || "");
+      scoreBadgeEl = h("div", {
+        style: {
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "4px",
+          padding: "2px 8px",
+          borderRadius: "var(--radius-full)",
+          fontSize: "11px",
+          fontWeight: "600",
+          background: isStrong ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)",
+          color: isStrong ? "var(--color-success)" : "var(--color-warning)",
+          border: `1px solid ${isStrong ? "rgba(16, 185, 129, 0.3)" : "rgba(245, 158, 11, 0.3)"}`
+        }
+      },
+        icon("sparkles", { size: 11 }),
+        document.createTextNode(`${j.score_label || "Match Fit"}: ${j.score}%`)
+      );
+    }
+
+    // Skills Display
+    const matchedSkills = j.matched_skills || [];
+    const missingSkills = j.missing_skills || [];
+    const generalSkills = j.skills || [];
+
+    const card = h("div", {
+      class: "card",
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        height: "100%",
+        padding: "var(--space-4)",
+        transition: "all var(--transition-fast)"
+      }
+    },
+      // Header Section
+      h("div", {},
+        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-2)", marginBottom: "var(--space-2)" } },
+          sourceBadge,
+          h("div", { style: { display: "flex", alignItems: "center", gap: "var(--space-2)" } },
+            scoreBadgeEl,
+            // Bookmark Button
+            h("button", {
+              type: "button",
+              class: "icon-btn icon-btn--sm",
+              "aria-label": isSaved ? "Remove from saved jobs" : "Save job",
+              style: { color: isSaved ? "var(--color-primary)" : "var(--text-muted)" },
               onclick: async (e) => {
                 e.stopPropagation();
-                await toggleSave(j.id, e.currentTarget);
+                await handleSaveJob(j, card);
               }
-            }, icon("bookmark", { size: 18, className: isSaved ? "icon-saved" : "" }))
-          : null
-      ),
-
-      // Tags Row
-      h("div", { style: { display: "flex", flexWrap: "wrap", gap: "var(--space-1)", marginBottom: "var(--space-3)" } },
-        badge(j.job_type || "Remote", "accent"),
-        j.category ? badge(j.category, "neutral") : null,
-        badge(j.experience_level || "Mid-Level", "neutral")
-      ),
-
-      // Description excerpt
-      h("p", { style: { fontSize: "var(--font-size-sm)", color: "var(--text-secondary)", flex: 1, marginBottom: "var(--space-4)", display: "-webkit-box", WebkitLineClamp: "3", WebkitBoxOrient: "vertical", overflow: "hidden" }, text: j.description }),
-
-      // Salary & Location
-      h("div", { style: { fontSize: "var(--font-size-xs)", color: "var(--text-muted)", marginBottom: "var(--space-3)", display: "flex", flexDirection: "column", gap: "2px" } },
-        h("span", {}, icon("mapPin", { size: 12 }), ` ${j.location || "Remote"}`),
-        (j.min_salary || j.max_salary)
-          ? h("span", { style: { fontWeight: "var(--font-weight-semibold)", color: "var(--color-primary)" } }, fmtSalary(j.min_salary, j.max_salary, j.salary_currency))
-          : null
-      ),
-
-      // Skills preview
-      j.skills && j.skills.length > 0
-        ? h("div", { class: "chip-list", style: { marginBottom: "var(--space-4)" } },
-            j.skills.slice(0, 4).map(s => chip(s, "neutral"))
+            }, icon(isSaved ? "bookmark" : "bookmark", { size: 16 }))
           )
-        : null,
+        ),
 
-      // Action Footer
-      h("div", { style: { borderTop: "1px solid var(--border-subtle)", paddingTop: "var(--space-3)", display: "flex", gap: "var(--space-2)" } },
+        // Job Title & Company
+        h("h3", {
+          style: {
+            fontSize: "var(--font-size-base)",
+            fontWeight: "var(--font-weight-semibold)",
+            color: "var(--text-primary)",
+            marginBottom: "var(--space-1)"
+          }
+        }, j.title),
+
+        h("div", {
+          style: {
+            fontSize: "var(--font-size-xs)",
+            color: "var(--text-secondary)",
+            marginBottom: "var(--space-3)",
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-3)",
+            flexWrap: "wrap"
+          }
+        },
+          h("span", { style: { fontWeight: "var(--font-weight-medium)", color: "var(--text-primary)" } }, j.company_name),
+          h("span", { style: { display: "flex", alignItems: "center", gap: "2px" } }, icon("mapPin", { size: 12 }), ` ${j.location || "Remote"}`),
+          h("span", { class: "badge badge--neutral", style: { fontSize: "10px" } }, (j.job_type || "remote").toUpperCase()),
+          j.posted_date ? h("span", { style: { color: "var(--text-muted)" } }, `• ${j.posted_date}`) : null
+        ),
+
+        // Relevance Explanation (if recommendation)
+        j.relevance_explanation ? h("div", {
+          style: {
+            padding: "var(--space-2) var(--space-3)",
+            borderRadius: "var(--radius-sm)",
+            background: "var(--bg-surface-2)",
+            borderLeft: "3px solid var(--color-primary)",
+            fontSize: "11px",
+            color: "var(--text-secondary)",
+            marginBottom: "var(--space-3)",
+            lineHeight: "1.4"
+          }
+        }, j.relevance_explanation) : null,
+
+        // Skills Breakdown Chips
+        isRecommendationMode ? h("div", { style: { marginBottom: "var(--space-3)" } },
+          matchedSkills.length > 0 ? h("div", { style: { display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "4px" } },
+            ...matchedSkills.slice(0, 4).map((s) => chip(s, "matched"))
+          ) : null,
+          missingSkills.length > 0 ? h("div", { style: { display: "flex", flexWrap: "wrap", gap: "4px" } },
+            ...missingSkills.slice(0, 3).map((s) => chip(s, "missing"))
+          ) : null
+        ) : (generalSkills.length > 0 ? h("div", { class: "chip-list", style: { marginBottom: "var(--space-3)" } },
+          ...generalSkills.slice(0, 5).map((s) => chip(s))
+        ) : null)
+      ),
+
+      // Footer Actions
+      h("div", {
+        style: {
+          display: "flex",
+          gap: "var(--space-2)",
+          paddingTop: "var(--space-3)",
+          borderTop: "1px solid var(--border-subtle)",
+          marginTop: "var(--space-2)"
+        }
+      },
+        // Analyse Match Button -> flows into AI Match Engine
         h("button", {
-          class: "btn btn--secondary btn--sm",
+          type: "button",
+          class: "btn btn--primary btn--sm",
           style: { flex: 1 },
-          onclick: () => viewJobDetails(j.id)
-        }, "Details"),
-        currentUser && currentUser.role === "candidate"
-          ? h("button", {
-              class: "btn btn--primary btn--sm",
-              style: { flex: 1 },
-              onclick: () => openApplyModal(j)
-            }, "Apply")
-          : currentUser && currentUser.role === "recruiter"
-            ? h("a", {
-                class: "btn btn--ai btn--sm",
-                href: `recruiter.html?job_id=${encodeURIComponent(j.id)}`
-              }, "Applicants")
-            : null
+          onclick: () => startJobAnalysis(j)
+        },
+          icon("sparkles", { size: 14 }),
+          document.createTextNode(" Analyse Match")
+        ),
+
+        // View Original Posting or Details
+        h("button", {
+          type: "button",
+          class: "btn btn--secondary btn--sm",
+          onclick: () => viewJobDetails(j)
+        },
+          j.external_url ? icon("external", { size: 14 }) : icon("eye", { size: 14 }),
+          document.createTextNode(j.external_url ? " Vacancy" : " Details")
+        )
       )
     );
 
     grid.appendChild(card);
   });
 
-  container.appendChild(grid);
+  container.replaceChildren(grid);
 }
 
-function renderPagination(jobCount) {
-  const container = $("#jobs-pagination-container");
-  if (!container) return;
+/* ==============================================================================
+ * Saved Jobs Management
+ * ============================================================================== */
+async function loadSavedJobs() {
+  if (!session.isSignedIn()) return;
+  try {
+    const list = await Api.jobs.saved();
+    savedJobIds = new Set((list || []).map((j) => j.id));
+  } catch {
+    savedJobIds = new Set();
+  }
+}
 
-  const pageNum = Math.floor(currentFilter.offset / currentFilter.limit) + 1;
-  const canGoPrev = currentFilter.offset > 0;
-  const canGoNext = jobCount === currentFilter.limit;
-
-  if (!canGoPrev && !canGoNext) {
-    container.replaceChildren();
+async function handleSaveJob(job, cardEl) {
+  if (!session.isSignedIn()) {
+    toast("Please sign in to save and bookmark jobs.", { type: "info" });
     return;
   }
 
-  const paginationNav = h("div", {
-    class: "card",
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "var(--space-3) var(--space-4)",
-      marginTop: "var(--space-6)"
-    }
-  },
-    h("button", {
-      class: "btn btn--secondary btn--sm",
-      disabled: !canGoPrev,
-      onclick: () => {
-        if (!canGoPrev) return;
-        currentFilter.offset = Math.max(0, currentFilter.offset - currentFilter.limit);
-        loadJobs();
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      }
-    }, icon("chevronLeft", { size: 14 }), " Previous Page"),
+  const isExternal = job.source_type === "live_vacancy" || (job.id && (job.id.startsWith("adzuna_") || job.id.startsWith("remotive_")));
 
-    h("div", { style: { fontSize: "var(--font-size-sm)", color: "var(--text-secondary)", fontWeight: "var(--font-weight-medium)" } },
-      `Page ${pageNum}`
-    ),
-
-    h("button", {
-      class: "btn btn--secondary btn--sm",
-      disabled: !canGoNext,
-      onclick: () => {
-        if (!canGoNext) return;
-        currentFilter.offset += currentFilter.limit;
-        loadJobs();
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      }
-    }, "Next Page ", icon("chevronRight", { size: 14 }))
-  );
-
-  container.replaceChildren(paginationNav);
-}
-
-async function viewJobDetails(jobId) {
   try {
-    const job = await Api.jobs.get(jobId);
-
-    const content = h("div", { style: { display: "flex", flexDirection: "column", gap: "var(--space-4)" } },
-      // Meta row
-      h("div", { style: { display: "flex", flexWrap: "wrap", gap: "var(--space-2)" } },
-        badge(job.job_type, "accent"),
-        badge(job.category || "Technology", "neutral"),
-        badge(job.experience_level, "neutral"),
-        h("span", { class: "badge badge--neutral", text: `${job.applicant_count} applicants` })
-      ),
-
-      // Location & Salary
-      h("div", { class: "card", style: { padding: "var(--space-3) var(--space-4)" } },
-        h("div", { style: { fontSize: "var(--font-size-sm)", color: "var(--text-secondary)" } },
-          h("strong", { text: "Location: " }), job.location || "Remote", " • ",
-          h("strong", { text: "Compensation: " }), fmtSalary(job.min_salary, job.max_salary, job.salary_currency) || "Competitive"
-        )
-      ),
-
-      // Description
-      h("div", {},
-        h("h4", { style: { fontSize: "var(--font-size-sm)", marginBottom: "var(--space-1)" }, text: "Job Description" }),
-        h("div", { style: { fontSize: "var(--font-size-sm)", color: "var(--text-secondary)", whiteSpace: "pre-line", lineHeight: "var(--line-height-relaxed)" }, text: job.description })
-      ),
-
-      // Requirements if present
-      job.requirements
-        ? h("div", {},
-            h("h4", { style: { fontSize: "var(--font-size-sm)", marginBottom: "var(--space-1)" }, text: "Role Requirements" }),
-            h("div", { style: { fontSize: "var(--font-size-sm)", color: "var(--text-secondary)", whiteSpace: "pre-line" }, text: job.requirements })
-          )
-        : null,
-
-      // Skills
-      job.skills && job.skills.length > 0
-        ? h("div", {},
-            h("h4", { style: { fontSize: "var(--font-size-sm)", marginBottom: "var(--space-2)" }, text: "Required Technical Skills" }),
-            h("div", { class: "chip-list" }, job.skills.map(s => chip(s, "accent")))
-          )
-        : null
-    );
-
-    const actions = [{ label: "Close", variant: "secondary" }];
-    if (currentUser && currentUser.role === "candidate") {
-      actions.push({
-        label: "Apply for this Position",
-        variant: "primary",
-        onClick: (e, close) => {
-          close();
-          openApplyModal(job);
-        }
+    let res;
+    if (isExternal) {
+      res = await Api.jobs.saveExternal({
+        id: job.id,
+        job_code: job.job_code || job.id,
+        title: job.title,
+        company_name: job.company_name,
+        location: job.location,
+        job_type: job.job_type,
+        experience_level: job.experience_level,
+        category: job.category,
+        description: job.description,
+        requirements: job.requirements,
+        min_salary: job.min_salary,
+        max_salary: job.max_salary,
+        salary_currency: job.salary_currency
       });
-    }
-
-    openDialog({
-      title: job.title,
-      description: `${job.company_name} • Posted on ${fmtDate(job.created_at)}`,
-      body: content,
-      size: "lg",
-      actions
-    });
-  } catch (err) {
-    toast(errorMessage(err, "Could not fetch job details."), { type: "error" });
-  }
-}
-
-async function toggleSave(jobId, btn) {
-  try {
-    const res = await Api.jobs.toggleSave(jobId);
-    if (res.saved) {
-      savedJobIds.add(jobId);
-      toast("Job saved to bookmarks.", { type: "success" });
-      btn.querySelector(".icon").classList.add("icon-saved");
+      if (res.saved) savedJobIds.add(job.id);
+      else savedJobIds.delete(job.id);
     } else {
-      savedJobIds.delete(jobId);
-      toast("Job removed from bookmarks.", { type: "info" });
-      btn.querySelector(".icon").classList.remove("icon-saved");
+      res = await Api.jobs.toggleSave(job.id);
+      if (res.saved) savedJobIds.add(job.id);
+      else savedJobIds.delete(job.id);
+    }
+
+    toast(res.message || (res.saved ? "Job saved!" : "Job removed."), { type: "success" });
+
+    // Update bookmark icon in card
+    const btn = cardEl.querySelector(".icon-btn");
+    if (btn) {
+      btn.style.color = res.saved ? "var(--color-primary)" : "var(--text-muted)";
     }
   } catch (err) {
-    toast(errorMessage(err, "Failed to update bookmark."), { type: "error" });
+    toast(errorMessage(err, "Could not update saved job."), { type: "error" });
   }
 }
 
-async function openApplyModal(job) {
-  let resumes = [];
-  try {
-    resumes = await Api.resumes.list();
-  } catch {
-    resumes = [];
+/* ==============================================================================
+ * Analysis Flow & Job Details Dialog
+ * ============================================================================== */
+function startJobAnalysis(job) {
+  // If external job, cache description in sessionStorage so match.html can populate text
+  if (job.source_type === "live_vacancy" || (job.id && (job.id.startsWith("adzuna_") || job.id.startsWith("remotive_")))) {
+    sessionStorage.setItem("target_job_analysis", JSON.stringify({
+      id: job.id,
+      title: job.title,
+      company: job.company_name,
+      description: job.description,
+      requirements: job.requirements
+    }));
+    window.location.href = `match.html?external=1&title=${encodeURIComponent(job.title)}`;
+  } else {
+    window.location.href = `match.html?job_id=${encodeURIComponent(job.id)}`;
+  }
+}
+
+function viewJobDetails(job) {
+  if (job.external_url) {
+    // Open authentic external application URL in a new tab safely
+    window.open(job.external_url, "_blank", "noopener,noreferrer");
+    return;
   }
 
-  const form = h("form", { id: "apply-form", style: { display: "flex", flexDirection: "column", gap: "var(--space-4)" } },
-    resumes.length > 0
-      ? h("div", { class: "field" },
-          h("label", { class: "field__label", for: "apply-resume-select", text: "Select Resume for Application" }),
-          h("select", { class: "select", id: "apply-resume-select", name: "resume_id" },
-            resumes.map(r => h("option", { value: r.id, selected: r.is_active }, `${r.file_name} (${r.ats_score}% ATS score)`))
-          )
-        )
-      : h("div", { class: "notice notice--warning" },
-          h("p", { text: "You have no uploaded resumes. Please upload a resume first in 'My Resumes' before applying." })
-        ),
-    h("div", { class: "field" },
-      h("label", { class: "field__label", for: "apply-cover-note", text: "Optional Cover Note to Recruiter" }),
-      h("textarea", { class: "textarea", id: "apply-cover-note", name: "cover_note", rows: 3, placeholder: "Briefly highlight your key competencies for this position…" })
+  // Database job details modal
+  const content = h("div", {},
+    h("div", { style: { marginBottom: "var(--space-3)" } },
+      h("h3", { style: { fontSize: "var(--font-size-lg)", color: "var(--text-primary)" } }, job.title),
+      h("p", { style: { fontSize: "var(--font-size-sm)", color: "var(--text-secondary)" } }, `${job.company_name} • ${job.location} • ${(job.job_type || "remote").toUpperCase()}`),
+      job.min_salary ? h("p", { style: { fontSize: "var(--font-size-xs)", color: "var(--color-primary)", fontWeight: "600", marginTop: "2px" } },
+        fmtSalary(job.min_salary, job.max_salary, job.salary_currency)
+      ) : null
+    ),
+    h("div", { style: { marginBottom: "var(--space-4)" } },
+      h("h4", { style: { fontSize: "var(--font-size-xs)", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: "4px" } }, "Description"),
+      h("div", { style: { fontSize: "var(--font-size-sm)", color: "var(--text-primary)", whiteSpace: "pre-line", maxHeight: "250px", overflowY: "auto", padding: "var(--space-2)", background: "var(--bg-surface-2)", borderRadius: "var(--radius-sm)" } },
+        job.description
+      )
+    ),
+    job.requirements ? h("div", { style: { marginBottom: "var(--space-4)" } },
+      h("h4", { style: { fontSize: "var(--font-size-xs)", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: "4px" } }, "Requirements"),
+      h("div", { style: { fontSize: "var(--font-size-sm)", color: "var(--text-secondary)", whiteSpace: "pre-line" } }, job.requirements)
+    ) : null,
+    h("div", { style: { display: "flex", justifyContent: "flex-end", gap: "var(--space-2)", marginTop: "var(--space-4)" } },
+      h("button", {
+        type: "button",
+        class: "btn btn--primary btn--sm",
+        onclick: () => startJobAnalysis(job)
+      }, icon("sparkles", { size: 14 }), document.createTextNode(" Analyze Match Fit"))
     )
   );
 
   openDialog({
-    title: `Apply to ${job.title}`,
-    description: job.company_name,
-    body: form,
-    size: "md",
-    actions: [
-      { label: "Cancel", variant: "secondary" },
-      {
-        label: "Submit Application",
-        variant: "primary",
-        onClick: async (e, close) => {
-          if (resumes.length === 0) {
-            toast("Upload a resume first before applying.", { type: "error" });
-            return;
-          }
-          const submitBtn = e.target;
-          setBusy(submitBtn, true, "Submitting…");
-          const resume_id = form.resume_id.value;
-          const cover_note = form.cover_note.value.trim();
-
-          try {
-            await Api.jobs.apply(job.id, { resume_id, cover_note: cover_note || undefined });
-            toast("Application submitted successfully! Your AI match score has been recorded.", { type: "success" });
-            close();
-          } catch (err) {
-            setBusy(submitBtn, false);
-            toast(errorMessage(err, "Failed to submit application."), { type: "error" });
-          }
-        }
-      }
-    ]
+    title: "Job Opening Specifications",
+    content
   });
 }
 
+function renderPagination(container, total, limit, offset, onPageChange) {
+  if (!container) return;
+  if (total <= limit) {
+    container.replaceChildren();
+    return;
+  }
+
+  const currentPage = Math.floor(offset / limit) + 1;
+  const totalPages = Math.ceil(total / limit);
+
+  const prevBtn = h("button", {
+    type: "button",
+    class: "btn btn--secondary btn--sm",
+    disabled: currentPage === 1,
+    onclick: () => onPageChange((currentPage - 2) * limit)
+  }, icon("chevronLeft", { size: 14 }), document.createTextNode(" Previous"));
+
+  const pageInfo = h("span", {
+    style: { fontSize: "var(--font-size-xs)", color: "var(--text-secondary)", alignSelf: "center" }
+  }, `Page ${currentPage} of ${totalPages}`);
+
+  const nextBtn = h("button", {
+    type: "button",
+    class: "btn btn--secondary btn--sm",
+    disabled: currentPage >= totalPages,
+    onclick: () => onPageChange(currentPage * limit)
+  }, document.createTextNode("Next "), icon("chevronRight", { size: 14 }));
+
+  container.replaceChildren(
+    h("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", gap: "var(--space-3)", marginTop: "var(--space-6)" } },
+      prevBtn,
+      pageInfo,
+      nextBtn
+    )
+  );
+}

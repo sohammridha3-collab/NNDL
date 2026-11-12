@@ -1,48 +1,77 @@
 """
-Main entry point for Inclusive Resume & Job Matching API (SDG 10)
-Run with: python main.py
+Canonical Launcher for Inclusive Resume & Job Matching API (SDG 10)
+Standardized local entry point: http://127.0.0.1:8001
 """
 import os
+import socket
 import sys
-import subprocess
 from pathlib import Path
 
-# Add backend directory to sys.path
-root_dir = Path(__file__).resolve().parent
-backend_dir = root_dir / "backend"
-if str(backend_dir) not in sys.path:
-    sys.path.insert(0, str(backend_dir))
+# Canonical directory anchors
+ROOT_DIR = Path(__file__).resolve().parent
+BACKEND_DIR = ROOT_DIR / "backend"
 
-def free_port_if_busy(port: int = 8001):
-    """Check if port 8001 is held by a stale process and release it."""
-    try:
-        if sys.platform == "win32":
-            output = subprocess.check_output(f"netstat -ano | findstr :{port}", shell=True, text=True, stderr=subprocess.DEVNULL)
-            for line in output.strip().splitlines():
-                if f":{port}" in line and "LISTENING" in line:
-                    parts = line.strip().split()
-                    pid = parts[-1]
-                    if pid.isdigit() and int(pid) != os.getpid():
-                        print(f"[*] Releasing busy port {port} from stale PID {pid}...")
-                        subprocess.call(f"taskkill /F /PID {pid}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception:
-        pass
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
-if __name__ == "__main__":
+
+def check_port_availability(host: str, port: int) -> bool:
+    """
+    Verifies that the requested host:port is free to bind.
+    Never terminates or kills processes.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        try:
+            s.bind((host, port))
+            return True
+        except OSError:
+            return False
+
+
+def main():
     import uvicorn
 
-    host = "127.0.0.1"
-    port = int(os.getenv("PORT", "8001"))
+    # Deployment host/port resolution
+    is_production = os.getenv("ENVIRONMENT", "").lower() == "production" or bool(os.getenv("RENDER"))
+    default_host = "0.0.0.0" if is_production else "127.0.0.1"
+    host = os.getenv("HOST", default_host)
+    
+    port_env = os.getenv("PORT")
+    port = int(port_env) if port_env and port_env.isdigit() else 8001
 
-    free_port_if_busy(port)
+    # Port conflict verification - report conflict clearly without killing processes or port-hopping
+    if not check_port_availability(host, port):
+        print("\n" + "!" * 76, file=sys.stderr)
+        print(f"  [ERROR] PORT CONFLICT DETECTED: http://{host}:{port} is already in use.", file=sys.stderr)
+        print(f"  Another application or process is actively listening on port {port}.", file=sys.stderr)
+        print(f"  To resolve this:", file=sys.stderr)
+        print(f"    1. Stop the application occupying port {port}, OR", file=sys.stderr)
+        print(f"    2. Specify a custom port via environment variable: PORT=8002 python main.py", file=sys.stderr)
+        print(f"  Startup aborted cleanly to prevent unauthorized interference.", file=sys.stderr)
+        print("!" * 76 + "\n", file=sys.stderr)
+        sys.exit(1)
 
-    print("\n" + "=" * 72)
-    print("  >>> INCLUSIVE ATS BACKEND (SDG 10: REDUCED INEQUALITIES) <<<")
+    print("\n" + "=" * 76)
+    print("  >>> INCLUSIVE RESUME & JOB MATCHING API (SDG 10) <<<")
     print(f"  -> Local API Service:      http://{host}:{port}")
-    print(f"  -> Swagger Documentation:  http://{host}:{port}/docs")
-    print(f"  -> Redoc Alternative UI:   http://{host}:{port}/redoc")
-    print(f"  -> Health Check Probe:     http://{host}:{port}/health")
-    print(f"  -> Frontend Application:   http://{host}:5500/frontend/")
-    print("=" * 72 + "\n")
+    print(f"  -> Interactive Swagger UI: http://{host}:{port}/docs")
+    print(f"  -> Health Check Endpoint:  http://{host}:{port}/health")
+    print(f"  -> Readiness Check Probe:  http://{host}:{port}/ready")
+    print(f"  -> Frontend Application:   http://127.0.0.1:5500/frontend/ (or index.html)")
+    print("=" * 76 + "\n")
 
-    uvicorn.run("app.main:app", host=host, port=port, reload=False, app_dir=str(backend_dir))
+    from app.main import app
+
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        log_level="info"
+    )
+
+
+if __name__ == "__main__":
+    main()

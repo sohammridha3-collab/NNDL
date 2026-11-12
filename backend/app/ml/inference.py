@@ -1,17 +1,33 @@
+from enum import Enum
 import logging
 import os
 import pickle
 from pathlib import Path
+import threading
 from typing import Any, Dict, List, Optional
+from fastapi import HTTPException
 import numpy as np
 import torch
 from torch import nn
 
 from app.core.config import settings
 from app.ml.embeddings import EmbeddingEncoder
-from app.ml.preprocessing import clean, calculate_skill_overlap, DEFAULT_SKILLS
+from app.ml.preprocessing import (
+    clean,
+    calculate_skill_overlap,
+    extract_requirements_breakdown,
+    generate_learning_checklist,
+    DEFAULT_SKILLS
+)
 
 logger = logging.getLogger("inclusive_ats.ml.inference")
+
+
+class ModelState(str, Enum):
+    UNINITIALIZED = "uninitialized"
+    LOADING = "loading"
+    READY = "ready"
+    FAILED = "failed"
 
 
 class MatchNetwork(nn.Module):
@@ -37,10 +53,14 @@ class MatchNetwork(nn.Module):
 
 class MLInferenceService:
     """
-    Singleton ML Inference Service that loads the trained model bundle once,
-    manages the encoder and PyTorch classifier, and executes reproducible inference.
+    Thread-safe Singleton ML Inference Service that manages the PyTorch classifier
+    and SentenceTransformer encoder with full state lifecycle tracking.
     """
     _instance: Optional["MLInferenceService"] = None
+    _lock: threading.Lock = threading.Lock()
+    _state: ModelState = ModelState.UNINITIALIZED
+    _init_error: Optional[str] = None
+    _ready_event: threading.Event = threading.Event()
 
     def __init__(self, model_path: Optional[str] = None):
         self.device = settings.DEVICE
@@ -51,10 +71,13 @@ class MLInferenceService:
         if not resolved_path.exists():
             # Check alternative locations
             candidates = [
+                Path(settings.MODEL_PATH),
+                Path(settings.APP_DIR / "app/ml/artifacts/model.pkl"),
+                Path(settings.ROOT_DIR / "backend/app/ml/artifacts/model.pkl"),
+                Path(settings.ROOT_DIR / "model (1).pkl"),
                 Path("app/ml/artifacts/model.pkl"),
                 Path("backend/app/ml/artifacts/model.pkl"),
-                Path("model (1).pkl"),
-                Path("../model (1).pkl")
+                Path("model (1).pkl")
             ]
             for cand in candidates:
                 if cand.exists():
@@ -102,10 +125,103 @@ class MLInferenceService:
         )
 
     @classmethod
-    def get_instance(cls) -> "MLInferenceService":
-        if cls._instance is None:
-            cls._instance = MLInferenceService()
-        return cls._instance
+    def get_instance(cls, wait_timeout: float = 25.0, block: bool = True) -> "MLInferenceService":
+        """
+        Thread-safe singleton accessor with non-blocking graceful degradation.
+        If the model is currently loading, waits up to wait_timeout. If still warming up,
+        raises a clean, retryable HTTP 503.
+        """
+        if cls._state == ModelState.READY and cls._instance is not None:
+            return cls._instance
+
+        if cls._state == ModelState.FAILED:
+            raise HTTPException(
+                status_code=503,
+                detail=f"ML Inference Engine failed to initialize: {cls._init_error}. Please contact system administrator."
+            )
+
+        # Trigger initialization if uninitialized
+        if cls._state == ModelState.UNINITIALIZED:
+            with cls._lock:
+                if cls._state == ModelState.UNINITIALIZED:
+                    cls._load_model_sync()
+
+        # If currently loading, wait for the background warmup to complete
+        if cls._state == ModelState.LOADING:
+            if block:
+                ready = cls._ready_event.wait(timeout=wait_timeout)
+                if ready and cls._state == ModelState.READY and cls._instance:
+                    return cls._instance
+            raise HTTPException(
+                status_code=503,
+                detail="ML Inference Engine is currently warming up. Please retry in a few seconds.",
+                headers={"Retry-After": "5"}
+            )
+
+        if cls._state == ModelState.READY and cls._instance:
+            return cls._instance
+
+        raise HTTPException(
+            status_code=503,
+            detail=f"ML Inference Engine is unavailable (state: {cls._state.value}). Error: {cls._init_error}"
+        )
+
+    @classmethod
+    def warmup_async(cls):
+        """Asynchronously pre-warms the ML model in a background daemon thread."""
+        if cls._state in (ModelState.LOADING, ModelState.READY):
+            return
+
+        def _worker():
+            with cls._lock:
+                if cls._state in (ModelState.LOADING, ModelState.READY):
+                    return
+                cls._load_model_sync()
+
+        thread = threading.Thread(target=_worker, daemon=True, name="ML-Warmup-Worker")
+        thread.start()
+
+    @classmethod
+    def _load_model_sync(cls):
+        cls._state = ModelState.LOADING
+        cls._ready_event.clear()
+        cls._init_error = None
+        try:
+            instance = MLInferenceService()
+            cls._instance = instance
+            cls._state = ModelState.READY
+            cls._ready_event.set()
+            logger.info("ML Inference Service state changed to READY.")
+        except Exception as e:
+            cls._state = ModelState.FAILED
+            cls._init_error = str(e)
+            cls._ready_event.set()
+            logger.error(f"ML Inference Service failed to load: {e}", exc_info=True)
+
+    @classmethod
+    def is_ready(cls) -> bool:
+        return cls._state == ModelState.READY and cls._instance is not None
+
+    @classmethod
+    def status_dict(cls) -> Dict[str, Any]:
+        return {
+            "state": cls._state.value,
+            "is_ready": cls._state == ModelState.READY,
+            "model_type": cls._instance.model_type if cls._instance else None,
+            "threshold": cls._instance.threshold if cls._instance else None,
+            "feature_dimension": cls._instance.architecture[0] if (cls._instance and hasattr(cls._instance, 'architecture')) else 770,
+            "error": cls._init_error
+        }
+
+    def predict(
+        self,
+        resume_text: str,
+        job_text: str,
+        mask: bool = True
+    ) -> Dict[str, Any]:
+        """Convenience alias for predict_pair."""
+        return self.predict_pair(resume_text=resume_text, job_text=job_text, mask=mask)
+
 
     def build_features(
         self,
@@ -174,11 +290,18 @@ class MLInferenceService:
             logit = self.model(tensor_input)
             probability = float(torch.sigmoid(logit).cpu().item())
 
-        # Skill extraction
+        # Skill extraction & overlap
         clean_resume = clean(resume_text, mask=mask)
         clean_job = clean(job_text, mask=mask)
         matched_skills, missing_skills, coverage = calculate_skill_overlap(
             clean_resume, clean_job, self.vocabulary
+        )
+
+        # Essential vs Preferred Requirements Breakdown
+        req_breakdown = extract_requirements_breakdown(
+            job_text=clean_job,
+            vocabulary=self.vocabulary,
+            resume_text=clean_resume
         )
 
         semantic_similarity = float(feature_matrix[0, 0])
@@ -186,26 +309,43 @@ class MLInferenceService:
         classification = "Strong Match" if is_strong_match else "Weaker Match"
         score_pct = round(probability * 100, 2)
 
-        # Construct transparent, evidence-based recommendations
+        # Construct transparent, evidence-based recommendations grounded in the actual job
         recommendations = []
-        if missing_skills:
-            top_missing = missing_skills[:4]
+        missing_ess = req_breakdown.get("missing_essential", [])
+        if missing_ess:
             recommendations.append(
-                f"Consider demonstrating experience or certifications in required skills: {', '.join(top_missing)}."
+                f"Essential Requirement Gap: The role specifies core competencies ({', '.join(missing_ess[:3])}) not explicitly detected in your resume."
             )
-        if semantic_similarity < 0.6:
+        elif missing_skills:
             recommendations.append(
-                "Align your resume terminology and project descriptions more closely with the role requirements."
+                f"Preferred Skill Enhancement: Demonstrating familiarity with ({', '.join(missing_skills[:3])}) will strengthen your candidate profile."
             )
-        if is_strong_match:
+
+        if semantic_similarity < 0.65:
             recommendations.append(
-                "Profile strongly aligns with job expectations. Highlight your experience in " +
-                f"{', '.join(matched_skills[:3]) if matched_skills else 'key competencies'}."
+                "Terminology Alignment: Rephrase experience bullets using the technical vocabulary and domain terminology seen in the job responsibilities."
             )
         else:
             recommendations.append(
-                "Add quantified achievements and concrete project impacts matching the job responsibilities."
+                "Strong Domain Alignment: Your background demonstrates solid thematic relevance to this team's core responsibilities."
             )
+
+        if is_strong_match:
+            recommendations.append(
+                f"Competitive Fit: Highlights your demonstrated strength in {', '.join(matched_skills[:3]) if matched_skills else 'core qualifications'}."
+            )
+        else:
+            recommendations.append(
+                "Impact Metrics: Quantify key achievements with measurable metrics (e.g. latency reduction, revenue impact, scale) relevant to this role."
+            )
+
+        # Skill-gap learning checklist & practice projects
+        learning_checklist = generate_learning_checklist(missing_skills)
+
+        disclaimer_text = (
+            "This score estimates résumé–job compatibility according to the model’s training labels. "
+            "It is not the probability of being hired."
+        )
 
         explanation = {
             "model_architecture": "770-dim Multi-Feature Neural Classifier",
@@ -221,7 +361,8 @@ class MLInferenceService:
                 else "No skills from the recognized vocabulary were detected in the job text; coverage is not applicable"
             ),
             "total_job_skills_found": len(matched_skills) + len(missing_skills),
-            "bias_masking_applied": mask
+            "bias_masking_applied": mask,
+            "disclaimer": disclaimer_text
         }
 
         return {
@@ -234,7 +375,10 @@ class MLInferenceService:
             "required_skill_coverage": round(coverage, 4),
             "matched_skills": matched_skills,
             "missing_skills": missing_skills,
+            "requirements_breakdown": req_breakdown,
+            "learning_checklist": learning_checklist,
             "recommendations": recommendations,
+            "disclaimer": disclaimer_text,
             "explanation": explanation,
             "model_version": "MiniLM + PyTorch MLP v1.0"
         }

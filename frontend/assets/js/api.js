@@ -377,7 +377,8 @@ export const Api = {
     updateApplicant: (jobId, appId, payload) => http.put(`/jobs/${enc(jobId)}/applicants/${enc(appId)}`, payload),
     mine: (status = "all", opts = {}) => http.get("/jobs/recruiter/mine", { ...opts, query: { status } }),
     myApplications: (opts) => http.get("/jobs/applications/mine", opts),
-    saved: (opts) => http.get("/jobs/saved/mine", opts)
+    saved: (opts) => http.get("/jobs/saved/mine", opts),
+    saveExternal: (payload) => http.post("/jobs/save-external", payload)
   },
   matching: {
     predict: (payload, opts = {}) => http.post("/matching/predict", payload, { timeout: CONFIG.INFERENCE_TIMEOUT_MS, ...opts }),
@@ -387,7 +388,9 @@ export const Api = {
   recommendations: {
     jobs: (query, opts = {}) => http.get("/recommendations/jobs", { timeout: CONFIG.INFERENCE_TIMEOUT_MS, ...opts, query }),
     candidates: (jobId, limit = 10, opts = {}) =>
-      http.get("/recommendations/candidates", { timeout: CONFIG.INFERENCE_TIMEOUT_MS, ...opts, query: { job_id: jobId, limit } })
+      http.get("/recommendations/candidates", { timeout: CONFIG.INFERENCE_TIMEOUT_MS, ...opts, query: { job_id: jobId, limit } }),
+    bySkills: (payload, opts = {}) => http.post("/recommendations/skills", payload, { timeout: CONFIG.INFERENCE_TIMEOUT_MS, ...opts }),
+    extractSkills: (payload, opts = {}) => http.post("/recommendations/extract-skills", payload, opts)
   },
   dashboard: {
     candidate: (opts) => http.get("/dashboard/candidate", opts),

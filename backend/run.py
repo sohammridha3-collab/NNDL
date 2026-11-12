@@ -1,39 +1,17 @@
-import os
-import socket
+"""
+Convenience launcher delegating directly to canonical main.py.
+Standardized local entry point: http://127.0.0.1:8001
+"""
 import sys
 from pathlib import Path
 
-# Add backend directory to sys.path
+# Add project root to sys.path
 backend_dir = Path(__file__).resolve().parent
-if str(backend_dir) not in sys.path:
-    sys.path.insert(0, str(backend_dir))
+root_dir = backend_dir.parent
+if str(root_dir) not in sys.path:
+    sys.path.insert(0, str(root_dir))
 
-import uvicorn
-
-def get_available_port(default_port: int = 8001, host: str = "127.0.0.1") -> int:
-    env_p = os.getenv("PORT")
-    if env_p and env_p.isdigit():
-        return int(env_p)
-    for p in range(default_port, default_port + 20):
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind((host, p))
-                return p
-        except OSError:
-            continue
-    return default_port
+from main import main
 
 if __name__ == "__main__":
-    host = "127.0.0.1"
-    port = get_available_port(8001, host)
-
-    print("\n" + "=" * 70)
-    print(" >>> Inclusive Resume & Job Matching API is starting up... <<<")
-    print(f" -> Local Web Service:      http://{host}:{port}")
-    print(f" -> Interactive Swagger UI: http://{host}:{port}/docs")
-    print(f" -> Alternative Redoc UI:   http://{host}:{port}/redoc")
-    print(f" -> Health Check Endpoint:  http://{host}:{port}/health")
-    if port != 8000:
-        print(f" [Note: Port 8000 was busy; automatically shifted to available port {port}]")
-    print("=" * 70 + "\n")
-    uvicorn.run("app.main:app", host=host, port=port, reload=True, app_dir=str(backend_dir))
+    main()

@@ -12,8 +12,28 @@ env/
 # Large datasets exceeding GitHub's 100 MB hard limit
 cv (1).csv
 
-# Local database backups and test databases
+# Environment configurations and secrets
+.env
+*.env
+backend/.env
+frontend/env.js.backup
+
+# Local SQLite databases and journals
+*.db
+backend/*.db
 *.db-journal
+backend/*.db-journal
+*.db.backup
+backend/*.db.backup
 test_*.db
 test_inclusive_ats.db
 
+# User uploaded resumes and private documents
+uploads/
+backend/uploads/
+
+# IDE / OS metadata
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,6 +1,0 @@
-
-    Summary: Experienced AI Engineer specializing in deep learning and NLP architectures.
-    Skills: Python, PyTorch, Docker, SQL, Machine Learning, Git.
-    Experience: 4 years training transformer pipelines and deploying real-time APIs.
-    Education: Master of Science in Computer Science.
-    

@@ -420,6 +420,82 @@ def toggle_save_job(
         return {"saved": True, "message": "Job successfully saved."}
 
 
+@router.post("/save-external", status_code=status.HTTP_201_CREATED)
+def save_external_job(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Persists an external live vacancy to the database and bookmarks it
+    under the authenticated user.
+    """
+    ext_id = payload.get("id") or payload.get("job_code") or payload.get("external_id")
+    if not ext_id:
+        raise HTTPException(status_code=400, detail="External job ID is required.")
+
+    # Check if job already exists in DB
+    job = db.query(Job).filter((Job.id == ext_id) | (Job.job_code == ext_id)).first()
+    if not job:
+        # Create company if needed
+        comp_name = payload.get("company_name", "Verified Employer").strip()
+        from app.models.models import Company
+        company = db.query(Company).filter(Company.name == comp_name).first()
+        if not company:
+            company = Company(name=comp_name, location=payload.get("location", "Remote"))
+            db.add(company)
+            db.flush()
+
+        job = Job(
+            id=ext_id,
+            job_code=ext_id,
+            company_id=company.id,
+            title=payload.get("title", "Software Engineer"),
+            category=payload.get("category", "Software & Engineering"),
+            description=payload.get("description", "External job listing."),
+            requirements=payload.get("requirements", "See original posting for details."),
+            location=payload.get("location", "Remote"),
+            job_type=payload.get("job_type", "remote"),
+            experience_level=payload.get("experience_level", "Mid-Level"),
+            min_salary=payload.get("min_salary"),
+            max_salary=payload.get("max_salary"),
+            salary_currency=payload.get("salary_currency", "USD"),
+            status="active"
+        )
+        db.add(job)
+        db.flush()
+
+    saved = db.query(SavedJob).filter(
+        SavedJob.job_id == job.id,
+        SavedJob.user_id == current_user.id
+    ).first()
+
+    if saved:
+        db.delete(saved)
+        db.commit()
+        return {
+            "saved": False,
+            "job_id": job.id,
+            "title": job.title,
+            "is_external": True,
+            "external_url": payload.get("external_url"),
+            "message": "Job removed from saved list."
+        }
+    else:
+        new_save = SavedJob(job_id=job.id, user_id=current_user.id)
+        db.add(new_save)
+        db.commit()
+        return {
+            "saved": True,
+            "job_id": job.id,
+            "title": job.title,
+            "is_external": True,
+            "external_url": payload.get("external_url"),
+            "message": "External vacancy successfully bookmarked."
+        }
+
+
+
 @router.get("/{job_id}/applicants", response_model=List[ApplicationResponse])
 def get_job_applicants(
     job_id: str,

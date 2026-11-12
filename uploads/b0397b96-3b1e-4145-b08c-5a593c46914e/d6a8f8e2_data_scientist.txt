@@ -1,6 +1,0 @@
-
-    Summary: AI & Data Specialist.
-    Skills: Python, Machine Learning, SQL, Pandas, NumPy.
-    Experience: 3 years building predictive models and data pipelines.
-    Education: B.S. in Data Science.
-    

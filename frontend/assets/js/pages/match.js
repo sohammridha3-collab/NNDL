@@ -35,18 +35,35 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupMatchInputs();
   await loadSelectOptions();
 
-  // Check URL parameters for pre-selected job or resume
+  // Check URL parameters for pre-selected job, resume, or external vacancy
   const urlParams = new URLSearchParams(window.location.search);
   const paramJobId = urlParams.get("job_id");
   const paramResumeId = urlParams.get("resume_id");
+  const isExternal = urlParams.get("external");
   const jobSelect = $("#match-job-select");
   const resumeSelect = $("#match-resume-select");
+  const jobTextarea = $("#match-job-text");
 
   if (paramJobId && jobSelect) {
     jobSelect.value = paramJobId;
   }
   if (paramResumeId && resumeSelect) {
     resumeSelect.value = paramResumeId;
+  }
+
+  // If navigated from live vacancy recommendation
+  if (isExternal && jobTextarea) {
+    try {
+      const stored = sessionStorage.getItem("target_job_analysis");
+      if (stored) {
+        const job = JSON.parse(stored);
+        jobTextarea.value = `${job.title} - ${job.company || "Verified Employer"}\n\nDescription:\n${job.description || ""}\n\nRequirements:\n${job.requirements || ""}`.trim();
+        if (jobSelect) jobSelect.value = "";
+        toast(`Target job loaded: ${job.title}`, { type: "info" });
+      }
+    } catch {
+      // Ignore parse error
+    }
   }
 });
 
@@ -301,7 +318,56 @@ function renderMatchResults(container, res) {
   );
   container.appendChild(heroCard);
 
-  // 2. Skills Analysis Breakdown Card
+  // 2. Requirements Breakdown (Essential vs Preferred Qualifications)
+  const reqBreakdown = res.requirements_breakdown;
+  if (reqBreakdown && (reqBreakdown.essential_skills?.length || reqBreakdown.preferred_skills?.length)) {
+    const reqCard = h("div", { class: "card", style: { marginBottom: "var(--space-6)" } },
+      h("h4", { class: "card__title", style: { marginBottom: "var(--space-3)" } },
+        icon("target", { size: 18 }),
+        document.createTextNode(" Role Qualifications: Essential vs. Preferred Requirements")
+      ),
+      h("div", { class: "grid grid--cols-2", style: { gap: "var(--space-4)" } },
+        // Essential / Core
+        h("div", { style: { padding: "var(--space-3)", background: "var(--bg-surface-2)", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" } },
+          h("h5", { style: { fontSize: "var(--font-size-sm)", color: "var(--text-primary)", fontWeight: "600", marginBottom: "var(--space-2)" } },
+            "Core / Essential Requirements"
+          ),
+          h("div", { style: { fontSize: "11px", color: "var(--text-muted)", marginBottom: "var(--space-2)" } },
+            `Matched: ${reqBreakdown.matched_essential?.length || 0} / ${reqBreakdown.essential_skills?.length || 0}`
+          ),
+          reqBreakdown.essential_skills?.length > 0
+            ? h("div", { class: "chip-list" },
+                reqBreakdown.essential_skills.map((s) => {
+                  const isMatched = reqBreakdown.matched_essential?.includes(s);
+                  return chip(s, isMatched ? "matched" : "missing");
+                })
+              )
+            : h("p", { class: "field__hint", text: "No distinct essential tags isolated." })
+        ),
+
+        // Preferred / Nice-to-have
+        h("div", { style: { padding: "var(--space-3)", background: "var(--bg-surface-2)", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" } },
+          h("h5", { style: { fontSize: "var(--font-size-sm)", color: "var(--text-primary)", fontWeight: "600", marginBottom: "var(--space-2)" } },
+            "Preferred / Nice-to-Have Skills"
+          ),
+          h("div", { style: { fontSize: "11px", color: "var(--text-muted)", marginBottom: "var(--space-2)" } },
+            `Matched: ${reqBreakdown.matched_preferred?.length || 0} / ${reqBreakdown.preferred_skills?.length || 0}`
+          ),
+          reqBreakdown.preferred_skills?.length > 0
+            ? h("div", { class: "chip-list" },
+                reqBreakdown.preferred_skills.map((s) => {
+                  const isMatched = reqBreakdown.matched_preferred?.includes(s);
+                  return chip(s, isMatched ? "matched" : "missing");
+                })
+              )
+            : h("p", { class: "field__hint", text: "No explicit preferred qualifications section in job text." })
+        )
+      )
+    );
+    container.appendChild(reqCard);
+  }
+
+  // 3. Skills Analysis Breakdown Card
   const skillsCard = h("div", { class: "card", style: { marginBottom: "var(--space-6)" } },
     h("h4", { class: "card__title", style: { marginBottom: "var(--space-3)" } }, icon("layers", { size: 18 }), " Extracted Skill Breakdown"),
     h("div", { class: "grid grid--cols-2", style: { gap: "var(--space-4)" } },
@@ -328,9 +394,46 @@ function renderMatchResults(container, res) {
   );
   container.appendChild(skillsCard);
 
-  // 3. Actionable Recommendations & Explainable Factors
+  // 4. Skill-Gap Learning Checklist & Practice Projects
+  const checklist = res.learning_checklist || [];
+  if (checklist.length > 0) {
+    const checklistCard = h("div", { class: "card", style: { marginBottom: "var(--space-6)" } },
+      h("h4", { class: "card__title", style: { marginBottom: "var(--space-2)" } },
+        icon("check", { size: 18 }),
+        document.createTextNode(" Skill-Gap Remediation: Recommended Practice Projects")
+      ),
+      h("p", { style: { fontSize: "var(--font-size-xs)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" } },
+        "Focused hands-on projects to bridge detected competency gaps before applying."
+      ),
+      h("div", { style: { display: "flex", flexDirection: "column", gap: "var(--space-3)" } },
+        ...checklist.map((item) => {
+          return h("div", {
+            style: {
+              padding: "var(--space-3) var(--space-4)",
+              background: "var(--bg-surface-2)",
+              borderRadius: "var(--radius-md)",
+              border: "1px solid var(--border-subtle)"
+            }
+          },
+            h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" } },
+              h("span", { style: { fontWeight: "600", fontSize: "var(--font-size-sm)", color: "var(--color-primary)" } }, item.topic),
+              chip(item.skill, "missing")
+            ),
+            h("p", { style: { fontSize: "var(--font-size-xs)", color: "var(--text-secondary)", margin: 0, lineHeight: "1.4" } }, item.project)
+          );
+        })
+      ),
+      h("div", { class: "notice notice--info", style: { marginTop: "var(--space-3)", marginBottom: 0, fontSize: "11px" } },
+        icon("info", { size: 14 }),
+        h("p", { text: "Guidance notice: This learning checklist and practice project suggestions are educational guidance to assist personal skill development. They do not constitute an offer or guarantee of employment." })
+      )
+    );
+    container.appendChild(checklistCard);
+  }
+
+  // 5. Actionable Recommendations & Explainable Factors
   const recsCard = h("div", { class: "card" },
-    h("h4", { class: "card__title", style: { marginBottom: "var(--space-3)" } }, icon("sparkles", { size: 18 }), " Optimization & Recommendations"),
+    h("h4", { class: "card__title", style: { marginBottom: "var(--space-3)" } }, icon("sparkles", { size: 18 }), " Grounded Suggestions & Optimization"),
     res.recommendations && res.recommendations.length > 0
       ? h("ul", { style: { paddingLeft: "var(--space-5)", fontSize: "var(--font-size-sm)", color: "var(--text-secondary)", display: "flex", flexDirection: "column", gap: "var(--space-2)" } },
           res.recommendations.map(r => h("li", { text: r }))

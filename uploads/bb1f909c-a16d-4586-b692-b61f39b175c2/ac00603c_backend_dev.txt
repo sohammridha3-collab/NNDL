@@ -1,6 +1,0 @@
-
-    Summary: Backend developer passionate about clean architecture.
-    Skills: Python, SQL, Git, Linux, Docker.
-    Experience: 4 years designing REST APIs and distributed data models.
-    Education: B.S. in Computer Engineering.
-    

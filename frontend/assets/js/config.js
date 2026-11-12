@@ -6,8 +6,13 @@
 const runtime = (typeof window !== "undefined" && window.APP_CONFIG) || {};
 
 function cleanOrigin(value, fallback) {
-  const v = typeof value === "string" && value.trim() ? value.trim() : fallback;
-  return v.replace(/\/+$/, "");
+  let v = typeof value === "string" && value.trim() ? value.trim() : fallback;
+  v = v.replace(/\/+$/, "");
+  // Ensure /api/v1 is never duplicated even if accidentally configured in origin
+  if (v.endsWith("/api/v1")) {
+    v = v.slice(0, -"/api/v1".length).replace(/\/+$/, "");
+  }
+  return v;
 }
 
 export const CONFIG = Object.freeze({

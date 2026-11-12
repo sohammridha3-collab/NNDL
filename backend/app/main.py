@@ -31,18 +31,11 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables verified/created successfully.")
     except Exception as e:
-        logger.error(f"Database schema initialization error: {e}")
+        logger.error(f"Database schema initialization error: {e}", exc_info=True)
 
-    # Startup: Warm up ML Model in background thread so server port opens immediately
-    def _warmup_ml():
-        logger.info("Pre-warming ML Inference Service and Sentence Transformer...")
-        try:
-            ml_service = MLInferenceService.get_instance()
-            logger.info(f"Model initialized: {ml_service.model_type} (Threshold: {ml_service.threshold})")
-        except Exception as e:
-            logger.warning(f"Could not pre-warm ML model on startup: {e}")
-
-    threading.Thread(target=_warmup_ml, daemon=True, name="ML-Warmup").start()
+    # Startup: Trigger background non-blocking ML model pre-warming
+    logger.info("Triggering non-blocking ML inference engine warm-up...")
+    MLInferenceService.warmup_async()
 
     yield
 
@@ -97,28 +90,33 @@ def health_check():
 
 @app.get("/ready", tags=["System"])
 def readiness_check():
-    """Readiness probe for Render deployment: checks DB connection and ML model."""
+    """Readiness probe: checks database connection and ML model state."""
     db_ok = False
+    db_msg = "unreachable"
     try:
         with engine.connect() as conn:
             db_ok = True
-    except Exception:
-        db_ok = False
+            db_msg = "connected"
+    except Exception as e:
+        db_msg = f"error: {str(e)}"
 
-    ml_ok = False
-    try:
-        service = MLInferenceService.get_instance()
-        ml_ok = service is not None
-    except Exception:
-        ml_ok = False
+    if not MLInferenceService.is_ready():
+        # Allow background warmup up to 10s to complete
+        MLInferenceService._ready_event.wait(timeout=10.0)
 
-    all_ready = db_ok and ml_ok
+    ml_status = MLInferenceService.status_dict()
+    all_ready = db_ok and ml_status.get("is_ready", False)
+
     return JSONResponse(
         status_code=status.HTTP_200_OK if all_ready else status.HTTP_503_SERVICE_UNAVAILABLE,
         content={
             "ready": all_ready,
-            "database": "connected" if db_ok else "unreachable",
-            "ml_model": "loaded" if ml_ok else "unavailable"
+            "database": db_msg,
+            "ml_model": "loaded" if all_ready else ml_status.get("state", "unknown"),
+            "model_state": ml_status.get("state", "unknown"),
+            "model_type": ml_status.get("model_type"),
+            "threshold": ml_status.get("threshold"),
+            "model_error": ml_status.get("error")
         }
     )
 

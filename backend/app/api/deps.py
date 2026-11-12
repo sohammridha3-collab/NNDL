@@ -8,6 +8,7 @@ from app.db.session import get_db
 from app.models.models import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 
 def get_current_user(
@@ -57,3 +58,24 @@ def require_role(allowed_roles: list[str]):
             )
         return current_user
     return role_checker
+
+
+def get_optional_user(
+    db: Session = Depends(get_db),
+    token: Optional[str] = Depends(oauth2_scheme_optional)
+) -> Optional[User]:
+    if not token:
+        return None
+    try:
+        payload = decode_token(token)
+        if payload.get("type") == "refresh":
+            return None
+        user_id = payload.get("sub")
+        if user_id:
+            user = db.query(User).filter(User.id == user_id).first()
+            if user and user.is_active:
+                return user
+    except Exception:
+        return None
+    return None
+

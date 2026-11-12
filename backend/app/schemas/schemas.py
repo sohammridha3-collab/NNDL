@@ -242,7 +242,13 @@ class MatchingResponse(BaseModel):
     required_skill_coverage: float
     matched_skills: List[str]
     missing_skills: List[str]
+    requirements_breakdown: Optional[Dict[str, Any]] = None
+    learning_checklist: Optional[List[Dict[str, Any]]] = None
     recommendations: List[str]
+    disclaimer: Optional[str] = (
+        "This score estimates résumé–job compatibility according to the model’s training labels. "
+        "It is not the probability of being hired."
+    )
     explanation: Dict[str, Any]
     model_version: str = "MiniLM + PyTorch MLP v1.0"
     # Optional metadata, populated for persisted history records
@@ -250,6 +256,75 @@ class MatchingResponse(BaseModel):
     resume_id: Optional[str] = None
     job_title: Optional[str] = None
     created_at: Optional[datetime] = None
+
+
+# ==========================================
+# SKILL EXTRACTION & SKILL-BASED RECOMMENDATION SCHEMAS
+# ==========================================
+class SkillExtractionRequest(BaseModel):
+    resume_id: Optional[str] = None
+    resume_text: Optional[str] = None
+    text: Optional[str] = None
+
+
+class SkillExtractionResponse(BaseModel):
+    skills: List[str]
+    source: str
+    count: int
+
+
+class JobRecommendationItem(BaseModel):
+    id: Optional[str] = None
+    job_code: Optional[str] = None
+    title: str
+    company_name: str
+    location: str
+    job_type: str  # remote, hybrid, on-site
+    experience_level: Optional[str] = None
+    category: Optional[str] = None
+    description: Optional[str] = None
+    min_salary: Optional[float] = None
+    max_salary: Optional[float] = None
+    salary_currency: Optional[str] = "USD"
+    posted_date: Optional[str] = None
+    source_type: str  # "curated_dataset" or "live_vacancy"
+    source_label: str  # "Curated Dataset Listing" or "Live Vacancy (Adzuna)"
+    external_url: Optional[str] = None
+    score: float  # 0 to 100
+    score_type: str  # "skills_only_relevance" or "model_probability_percent"
+    score_label: str  # "Skills-Only Relevance" or "AI Résumé-Job Match Fit"
+    classification: Optional[str] = None
+    semantic_similarity: float
+    skill_coverage: float
+    matched_skills: List[str]
+    missing_skills: List[str]
+    relevance_explanation: str
+    is_saved: bool = False
+
+
+class SkillRecommendationRequest(BaseModel):
+    skills: List[str] = Field(default_factory=list)
+    resume_id: Optional[str] = None
+    resume_text: Optional[str] = None
+    category: Optional[str] = None
+    job_type: Optional[str] = None
+    location: Optional[str] = None
+    experience_level: Optional[str] = None
+    min_salary: Optional[float] = None
+    limit: int = Field(default=12, ge=1, le=50)
+    offset: int = Field(default=0, ge=0)
+    include_external: bool = True
+
+
+class SkillRecommendationResponse(BaseModel):
+    total: int
+    page: int
+    limit: int
+    active_skills: List[str]
+    has_resume_context: bool
+    api_status: Dict[str, Any]
+    items: List[JobRecommendationItem]
+
 
 
 # ==========================================
