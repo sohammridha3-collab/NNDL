@@ -323,6 +323,11 @@ class JobRecommendationItem(BaseModel):
     source_type: str  # "curated_dataset" or "live_vacancy"
     source_label: str  # "Curated Dataset Listing" or "Live Vacancy (Adzuna)"
     external_url: Optional[str] = None
+    source_url: Optional[str] = None
+    application_url: Optional[str] = None
+    retrieved_at: Optional[str] = None
+    is_cached: bool = False
+    freshness_label: str = "Retrieved recently"
     score: float  # 0 to 100
     score_type: str  # "skills_only_relevance" or "model_probability_percent" or "unranked_sparse_description"
     score_label: str  # "Skills-Only Relevance" or "AI Résumé-Job Match Fit"

@@ -181,8 +181,16 @@ def parse_month_year(date_str: str) -> Optional[int]:
         if 1970 <= year <= now.year + 2:
             return year * 12 + month
 
-    # Pattern: "01/2020" or "1-2020"
-    m_num = re.search(r'(\d{1,2})[/\-\.](\d{4})', cleaned)
+    # Pattern: "2020-01" or "2020/01" (Year-Month)
+    m_ym = re.search(r'\b(\d{4})[/\-\.](\d{1,2})\b', cleaned)
+    if m_ym:
+        year = int(m_ym.group(1))
+        month = max(1, min(12, int(m_ym.group(2))))
+        if 1970 <= year <= now.year + 2:
+            return year * 12 + month
+
+    # Pattern: "01/2020" or "1-2020" (Month-Year)
+    m_num = re.search(r'\b(\d{1,2})[/\-\.](\d{4})\b', cleaned)
     if m_num:
         month = max(1, min(12, int(m_num.group(1))))
         year = int(m_num.group(2))
@@ -237,9 +245,9 @@ def parse_employment_history(experience_text: str, full_text: str) -> Tuple[List
 
     # Date range regex pattern
     date_range_regex = re.compile(
-        r'((?:[a-zA-Z]{3,9}\.?\s+)?\d{4}|\d{1,2}[/\-\.]\d{4})'
-        r'\s*[\-–to\—]+\s*'
-        r'((?:[a-zA-Z]{3,9}\.?\s+)?\d{4}|\d{1,2}[/\-\.]\d{4}|present|current|now|till date)',
+        r'((?:[a-zA-Z]{3,9}\.?\s+)?\d{4}|\d{1,2}[/\-\.]\d{4}|\d{4}[/\-\.]\d{1,2})'
+        r'\s*(?:[\-–—]|to|until)\s*'
+        r'((?:[a-zA-Z]{3,9}\.?\s+)?\d{4}|\d{1,2}[/\-\.]\d{4}|\d{4}[/\-\.]\d{1,2}|present|current|now|till date)',
         re.IGNORECASE
     )
 

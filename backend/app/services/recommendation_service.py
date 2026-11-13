@@ -267,6 +267,11 @@ class RecommendationService:
                 "source_type": "curated_dataset",
                 "source_label": "Curated Dataset Listing",
                 "external_url": None,
+                "source_url": None,
+                "application_url": None,
+                "retrieved_at": j.created_at.strftime("%b %d, %Y") if j.created_at else None,
+                "is_cached": False,
+                "freshness_label": "Confirmed active (Curated Dataset)",
                 "full_text": f"{j.title} {j.category or ''}\n{j.description}\n{j.requirements or ''}"
             })
 
@@ -286,6 +291,7 @@ class RecommendationService:
                 )
                 search_res = registry.search_live_jobs(search_q)
                 if search_res.status == "success":
+                    is_cached_query = getattr(search_res, "cached", False)
                     for item in search_res.items:
                         candidate_pool.append({
                             "id": item.source_id,
@@ -301,10 +307,15 @@ class RecommendationService:
                             "min_salary": item.min_salary,
                             "max_salary": item.max_salary,
                             "salary_currency": item.salary_currency or "INR",
-                            "posted_date": item.posting_date or "Recently posted",
+                            "posted_date": item.posting_date,
                             "source_type": "live_vacancy",
                             "source_label": item.source_label,
                             "external_url": item.application_url or item.source_url,
+                            "source_url": item.source_url,
+                            "application_url": item.application_url or item.source_url,
+                            "retrieved_at": item.retrieval_timestamp,
+                            "is_cached": is_cached_query,
+                            "freshness_label": "Retrieved recently (Cached)" if is_cached_query else "Retrieved recently (Live Provider)",
                             "full_text": f"{item.title} {item.category or ''}\n{item.description}"
                         })
 
@@ -513,6 +524,11 @@ class RecommendationService:
                 source_type=cand["source_type"],
                 source_label=cand["source_label"],
                 external_url=cand.get("external_url"),
+                source_url=cand.get("source_url"),
+                application_url=cand.get("application_url"),
+                retrieved_at=cand.get("retrieved_at"),
+                is_cached=cand.get("is_cached", False),
+                freshness_label=cand.get("freshness_label", "Retrieved recently"),
                 score=score,
                 score_type=score_type,
                 score_label=score_label,

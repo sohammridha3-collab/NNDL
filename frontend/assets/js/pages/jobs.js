@@ -232,6 +232,72 @@ function removeSkill(name) {
 }
 
 /* ==============================================================================
+ * Flow Stepper & Progress State Helpers
+ * ============================================================================== */
+function updateStepper(step) {
+  const steps = [
+    { pill: $("#step-pill-1"), num: $("#step-num-1") },
+    { pill: $("#step-pill-2"), num: $("#step-num-2") },
+    { pill: $("#step-pill-3"), num: $("#step-num-3") },
+    { pill: $("#step-pill-4"), num: $("#step-num-4") },
+    { pill: $("#step-pill-5"), num: $("#step-num-5") }
+  ];
+
+  steps.forEach((s, idx) => {
+    if (!s.pill || !s.num) return;
+    const stepIdx = idx + 1;
+    if (stepIdx < step) {
+      s.pill.style.color = "var(--color-success)";
+      s.pill.style.fontWeight = "500";
+      s.num.style.background = "var(--color-success)";
+      s.num.style.color = "#fff";
+      s.num.innerHTML = "✓";
+    } else if (stepIdx === step) {
+      s.pill.style.color = "var(--color-primary)";
+      s.pill.style.fontWeight = "600";
+      s.num.style.background = "var(--color-primary)";
+      s.num.style.color = "#fff";
+      s.num.textContent = String(stepIdx);
+    } else {
+      s.pill.style.color = "var(--text-muted)";
+      s.pill.style.fontWeight = "500";
+      s.num.style.background = "var(--bg-surface-3)";
+      s.num.style.color = "var(--text-secondary)";
+      s.num.textContent = String(stepIdx);
+    }
+  });
+}
+
+function setProgressState(show, title = "", desc = "") {
+  const banner = $("#search-progress-banner");
+  const titleEl = $("#search-progress-title");
+  const descEl = $("#search-progress-desc");
+  if (!banner) return;
+  if (!show) {
+    banner.style.display = "none";
+    return;
+  }
+  banner.style.display = "block";
+  if (titleEl) titleEl.textContent = title;
+  if (descEl) descEl.textContent = desc;
+}
+
+function fmtRetrievalTime(isoStr) {
+  if (!isoStr) return null;
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return String(isoStr);
+    const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (diffSec < 60) return "just now";
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  } catch {
+    return null;
+  }
+}
+
+/* ==============================================================================
  * Résumé Extraction & Recommendations Controls
  * ============================================================================== */
 async function loadUserResumes() {
@@ -279,8 +345,13 @@ function setupRecommendationsControls() {
   const catSelect = $("#rec-category-select");
   const extCheck = $("#include-external-checkbox");
 
+  updateStepper(1);
+
   resumeSelect?.addEventListener("change", () => {
     skillFilter.resume_id = resumeSelect.value;
+    if (resumeSelect.value) {
+      updateStepper(2);
+    }
   });
 
   // Direct File Upload handler
@@ -293,6 +364,8 @@ function setupRecommendationsControls() {
     if (!file) return;
 
     if (uploadText) uploadText.textContent = `Uploading ${file.name}…`;
+    setProgressState(true, "Reading résumé…", `Uploading and parsing ${file.name}…`);
+    updateStepper(2);
     try {
       const uploaded = await Api.resumes.upload(file);
       userResumes.push(uploaded);
@@ -308,6 +381,8 @@ function setupRecommendationsControls() {
     } catch (err) {
       if (uploadText) uploadText.textContent = "Upload File (.pdf/.docx)";
       toast(errorMessage(err, "Failed to upload résumé file."), { type: "error" });
+    } finally {
+      setProgressState(false);
     }
   });
 
@@ -326,7 +401,13 @@ function setupRecommendationsControls() {
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean);
+    updateStepper(3);
   });
+
+  locInput?.addEventListener("input", () => updateStepper(3));
+  arrSelect?.addEventListener("change", () => updateStepper(3));
+  expSelect?.addEventListener("change", () => updateStepper(3));
+  catSelect?.addEventListener("change", () => updateStepper(3));
 
   // Extract & Profile Summary Button
   extractBtn?.addEventListener("click", async () => {
@@ -378,6 +459,7 @@ function setupRecommendationsControls() {
       alertContainer.replaceChildren();
     }
 
+    updateStepper(1);
     loadSkillRecommendations();
   });
 
@@ -389,6 +471,7 @@ function setupRecommendationsControls() {
         locInput.value = loc;
         skillFilter.location = loc;
         skillFilter.offset = 0;
+        updateStepper(3);
         loadSkillRecommendations();
       }
     });
@@ -425,6 +508,7 @@ async function handleProfileSummaryExtraction() {
   }
 
   setBusy(extractBtn, true, "Analyzing Profile…");
+  setProgressState(true, "Reading résumé & parsing profile…", "Extracting canonical skills, detecting role titles, and calculating non-overlapping tenure…");
   try {
     const payload = {
       resume_id: selectedResumeId || undefined,
@@ -507,6 +591,7 @@ async function handleProfileSummaryExtraction() {
                 current.push(t);
                 if (prefTitlesInput) prefTitlesInput.value = current.join(", ");
                 skillFilter.preferred_titles = current;
+                updateStepper(3);
               }
             }
           }, `+ ${t}`);
@@ -546,11 +631,13 @@ async function handleProfileSummaryExtraction() {
       previewContainer.style.display = "block";
     }
 
+    updateStepper(3);
     toast(`Profile extracted! Verified ${res.skills.length} skills and ${res.total_experience_years.toFixed(1)} yrs experience.`, { type: "success" });
   } catch (err) {
     toast(errorMessage(err, "Failed to analyze résumé profile."), { type: "error" });
   } finally {
     setBusy(extractBtn, false);
+    setProgressState(false);
   }
 }
 
@@ -584,6 +671,7 @@ function applyBroadeningSuggestion(sug) {
     skillFilter.category = "";
   }
   skillFilter.offset = 0;
+  updateStepper(3);
   loadSkillRecommendations();
   toast(`Applied suggestion: "${sug}"`, { type: "info" });
 }
@@ -596,9 +684,21 @@ async function loadSkillRecommendations() {
   const paginationContainer = $("#jobs-pagination-container");
   const countBadge = $("#results-count-badge");
   const apiBadge = $("#external-api-badge");
+  const findBtn = $("#find-matches-btn");
+  const resetBtn = $("#reset-recommendations-btn");
+  const extractBtn = $("#extract-skills-btn");
+  const uploadBtn = $("#rec-upload-file-btn");
   if (!container) return;
 
-  container.replaceChildren(loadingState("Matching opportunities against canonical skills & neural embeddings…"));
+  // Prevent duplicate submissions by locking action buttons
+  setBusy(findBtn, true, "Finding Matches…");
+  if (resetBtn) resetBtn.disabled = true;
+  if (extractBtn) extractBtn.disabled = true;
+  if (uploadBtn) uploadBtn.disabled = true;
+
+  updateStepper(4);
+  setProgressState(true, "Searching connected sources…", "Querying platform catalog and live authorized API feeds…");
+  container.replaceChildren(loadingState("Searching connected sources & evaluating candidate fit…"));
 
   try {
     const payload = {
@@ -615,6 +715,7 @@ async function loadSkillRecommendations() {
       offset: skillFilter.offset
     };
 
+    setProgressState(true, "Ranking results…", "Evaluating semantic alignment, qualification overlap, and neural model compatibility…");
     const res = await Api.recommendations.bySkills(payload);
 
     // Update API provider badge
@@ -709,6 +810,7 @@ async function loadSkillRecommendations() {
 
       container.replaceChildren(emptyCard);
       if (paginationContainer) paginationContainer.replaceChildren();
+      updateStepper(5);
       return;
     }
 
@@ -718,10 +820,23 @@ async function loadSkillRecommendations() {
       loadSkillRecommendations();
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
+    updateStepper(5);
   } catch (err) {
+    const isRateLimited = err?.status === 429 || (err?.message && /rate.limit|quota/i.test(err.message));
     container.replaceChildren(
-      errorState("Failed to retrieve skill recommendations. Please check server connectivity.", () => loadSkillRecommendations())
+      errorState(
+        isRateLimited
+          ? "API Provider Quota Limit Reached: External job provider's rate limit reached for today. Displaying verified platform postings."
+          : errorMessage(err, "Failed to retrieve job recommendations. Your input criteria have been preserved."),
+        () => loadSkillRecommendations()
+      )
     );
+  } finally {
+    setBusy(findBtn, false);
+    if (resetBtn) resetBtn.disabled = false;
+    if (extractBtn) extractBtn.disabled = false;
+    if (uploadBtn) uploadBtn.disabled = false;
+    setProgressState(false);
   }
 }
 
@@ -842,6 +957,29 @@ function renderJobCards(container, jobs, isRecommendationMode = false) {
           document.createTextNode(" Curated Dataset")
         );
 
+    // Cached Badge
+    const cachedBadge = j.is_cached
+      ? h("span", { class: "badge badge--neutral", style: { fontSize: "10px" }, title: "Served from rate-limit cache" },
+          icon("clock", { size: 10 }),
+          document.createTextNode(" Cached")
+        )
+      : null;
+
+    // Freshness Badge (Distinguish "Retrieved recently" from "Confirmed active")
+    const freshnessText = j.freshness_label || (isExternal ? "Retrieved recently" : "Confirmed active");
+    const isConfirmedActive = freshnessText.toLowerCase().includes("confirmed active");
+    const freshnessBadge = h("span", {
+      class: `badge ${isConfirmedActive ? "badge--success" : "badge--neutral"}`,
+      style: { fontSize: "10px" },
+      title: isConfirmedActive ? "Verified listing currently active in database" : "Retrieved from provider feed; listings may expire"
+    }, freshnessText);
+
+    const badgeGroup = h("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px" } },
+      sourceBadge,
+      cachedBadge,
+      freshnessBadge
+    );
+
     // Score Badge (for recommendations)
     let scoreBadgeEl = null;
     if (isRecommendationMode) {
@@ -923,7 +1061,7 @@ function renderJobCards(container, jobs, isRecommendationMode = false) {
       // Header Section
       h("div", {},
         h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-2)", marginBottom: "var(--space-2)" } },
-          sourceBadge,
+          badgeGroup,
           h("div", { style: { display: "flex", alignItems: "center", gap: "var(--space-2)" } },
             scoreBadgeEl,
             // Bookmark Button
@@ -964,7 +1102,8 @@ function renderJobCards(container, jobs, isRecommendationMode = false) {
           h("span", { style: { fontWeight: "var(--font-weight-medium)", color: "var(--text-primary)" } }, j.company_name),
           h("span", { style: { display: "flex", alignItems: "center", gap: "2px" } }, icon("mapPin", { size: 12 }), ` ${j.location || "Remote"}`),
           h("span", { class: "badge badge--neutral", style: { fontSize: "10px" } }, (j.job_type || "remote").toUpperCase()),
-          j.posted_date ? h("span", { style: { color: "var(--text-muted)" } }, `• ${j.posted_date}`) : null
+          j.posted_date ? h("span", { style: { color: "var(--text-muted)" } }, `• ${j.posted_date}`) : null,
+          j.retrieved_at ? h("span", { style: { color: "var(--text-muted)" }, title: `Retrieved: ${j.retrieved_at}` }, `• Retrieved ${fmtRetrievalTime(j.retrieved_at) || j.retrieved_at}`) : null
         ),
 
         // Experience Requirements (if available)
@@ -1039,35 +1178,69 @@ function renderJobCards(container, jobs, isRecommendationMode = false) {
       ),
 
       // Footer Actions
+      const targetAppUrl = j.application_url || j.source_url || j.external_url;
+
+      const saveJobBtn = h("button", {
+        type: "button",
+        class: "btn btn--secondary btn--sm",
+        "data-action": "save-job",
+        style: {
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "4px",
+          color: isSaved ? "var(--color-primary)" : "inherit",
+          borderColor: isSaved ? "var(--color-primary)" : "var(--border-subtle)"
+        },
+        onclick: async (e) => {
+          e.stopPropagation();
+          await handleSaveJob(j, card);
+        }
+      },
+        icon("bookmark", { size: 13 }),
+        document.createTextNode(isSaved ? " Saved" : " Save Job")
+      );
+
+      const analyseMatchBtn = h("button", {
+        type: "button",
+        class: "btn btn--primary btn--sm",
+        style: { display: "inline-flex", alignItems: "center", gap: "4px", flex: 1 },
+        onclick: () => startJobAnalysis(j)
+      },
+        icon("sparkles", { size: 13 }),
+        document.createTextNode(" Analyse Match")
+      );
+
+      const applySourceBtn = h("button", {
+        type: "button",
+        class: "btn btn--secondary btn--sm",
+        style: { display: "inline-flex", alignItems: "center", gap: "4px" },
+        title: targetAppUrl ? `Open authentic posting on ${j.source_label || "provider"}` : "View specifications",
+        onclick: () => {
+          if (targetAppUrl) {
+            window.open(targetAppUrl, "_blank", "noopener,noreferrer");
+          } else {
+            viewJobDetails(j);
+          }
+        }
+      },
+        icon(targetAppUrl ? "external" : "eye", { size: 13 }),
+        document.createTextNode(targetAppUrl ? " Apply on Source" : " Details")
+      );
+
       h("div", {
         style: {
           display: "flex",
           gap: "var(--space-2)",
           paddingTop: "var(--space-3)",
           borderTop: "1px solid var(--border-subtle)",
-          marginTop: "var(--space-2)"
+          marginTop: "var(--space-2)",
+          alignItems: "center",
+          flexWrap: "wrap"
         }
       },
-        // Analyse Match Button -> flows into AI Match Engine
-        h("button", {
-          type: "button",
-          class: "btn btn--primary btn--sm",
-          style: { flex: 1 },
-          onclick: () => startJobAnalysis(j)
-        },
-          icon("sparkles", { size: 14 }),
-          document.createTextNode(" Analyse Match")
-        ),
-
-        // View Original Posting or Details
-        h("button", {
-          type: "button",
-          class: "btn btn--secondary btn--sm",
-          onclick: () => viewJobDetails(j)
-        },
-          j.external_url ? icon("external", { size: 14 }) : icon("eye", { size: 14 }),
-          document.createTextNode(j.external_url ? " Vacancy" : " Details")
-        )
+        saveJobBtn,
+        analyseMatchBtn,
+        applySourceBtn
       )
     );
 
@@ -1126,10 +1299,21 @@ async function handleSaveJob(job, cardEl) {
 
     toast(res.message || (res.saved ? "Job saved!" : "Job removed."), { type: "success" });
 
-    // Update bookmark icon in card
+    // Update bookmark icon in card header
     const btn = cardEl.querySelector(".icon-btn");
     if (btn) {
       btn.style.color = res.saved ? "var(--color-primary)" : "var(--text-muted)";
+    }
+
+    // Update footer Save Job button
+    const footerSaveBtn = cardEl.querySelector('[data-action="save-job"]');
+    if (footerSaveBtn) {
+      footerSaveBtn.replaceChildren(
+        icon("bookmark", { size: 13 }),
+        document.createTextNode(res.saved ? " Saved" : " Save Job")
+      );
+      footerSaveBtn.style.color = res.saved ? "var(--color-primary)" : "inherit";
+      footerSaveBtn.style.borderColor = res.saved ? "var(--color-primary)" : "var(--border-subtle)";
     }
   } catch (err) {
     toast(errorMessage(err, "Could not update saved job."), { type: "error" });
