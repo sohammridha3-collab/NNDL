@@ -159,6 +159,46 @@ def identify_sections(text: str) -> Dict[str, str]:
     return {sec: "\n".join(content) for sec, content in sections.items() if content}
 
 
+def evaluate_resume_completeness(text: str, sections: Dict[str, str]) -> Tuple[float, float, List[str], List[str], List[str]]:
+    """
+    Evaluates ATS score, completeness score, identified sections, missing sections, and suggestions.
+    """
+    critical_sections = ["experience", "education", "skills"]
+    optional_sections = ["summary", "projects", "certifications"]
+
+    present_critical = [s for s in critical_sections if s in sections and len(sections[s].strip()) > 5]
+    present_optional = [s for s in optional_sections if s in sections and len(sections[s].strip()) > 5]
+    missing_critical = [s for s in critical_sections if s not in present_critical]
+
+    # Completeness calculation
+    completeness = (len(present_critical) * 25.0) + (len(present_optional) * 8.33)
+    completeness = min(100.0, round(completeness, 1))
+
+    # ATS formatting readability check
+    ats_score = 50.0  # Base score for valid parsable text
+    word_count = len(text.split())
+    if 250 <= word_count <= 1200:
+        ats_score += 20.0
+    elif word_count > 40:
+        ats_score += 15.0
+
+    ats_score += len(present_critical) * 8.0
+    ats_score += len(present_optional) * 2.0
+    ats_score = min(100.0, round(ats_score, 1))
+
+    recommendations = []
+    for miss in missing_critical:
+        recommendations.append(f"Add a distinct '{miss.capitalize()}' section to ensure ATS parser recognition.")
+    if "projects" not in sections:
+        recommendations.append("Consider adding a 'Projects' section showcasing real-world technical impact.")
+    if "summary" not in sections:
+        recommendations.append("Add a 2-3 line Professional Summary highlighting your career focus.")
+    if word_count < 250:
+        recommendations.append("Resume length is under 250 words; consider detailing project achievements.")
+
+    return ats_score, completeness, list(sections.keys()), missing_critical, recommendations
+
+
 def parse_month_year(date_str: str) -> Optional[int]:
     """
     Converts a date string (e.g. 'Jan 2020', '03/2021', '2019', 'Present')

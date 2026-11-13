@@ -420,7 +420,7 @@ class RecommendationService:
                 "initial_relevance": initial_relevance,
                 "qual_breakdown": qual_breakdown,
                 "experience_req": experience_req,
-                "desc_len": len(candidate.get("description") or "")
+                "desc_len": len(f"{candidate.get('description') or ''} {candidate.get('requirements') or ''}".strip())
             })
 
         # Shortlist top candidates (e.g. top 25)

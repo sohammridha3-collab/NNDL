@@ -35,12 +35,40 @@ INDIAN_LOCATIONS = {
 class AdzunaJobProvider(JobProvider):
     name = "adzuna"
 
+    def __init__(
+        self,
+        app_id: Optional[str] = None,
+        app_key: Optional[str] = None,
+        default_country: Optional[str] = None
+    ):
+        self._app_id = app_id
+        self._app_key = app_key
+        self._default_country = default_country
+
+    @property
+    def app_id(self) -> Optional[str]:
+        if self._app_id:
+            return self._app_id.strip()
+        return settings.ADZUNA_APP_ID.strip() if settings.ADZUNA_APP_ID else None
+
+    @property
+    def app_key(self) -> Optional[str]:
+        if self._app_key:
+            return self._app_key.strip()
+        return settings.ADZUNA_APP_KEY.strip() if settings.ADZUNA_APP_KEY else None
+
+    @property
+    def default_country(self) -> str:
+        if self._default_country:
+            return self._default_country.strip().lower()
+        return (settings.ADZUNA_COUNTRY or "in").strip().lower()
+
     def is_configured(self) -> bool:
-        return bool(settings.ADZUNA_APP_ID and settings.ADZUNA_APP_KEY)
+        return bool(self.app_id and self.app_key)
 
     def get_status(self) -> Dict[str, Any]:
         configured = self.is_configured()
-        country = settings.ADZUNA_COUNTRY or "in"
+        country = self.default_country
         return {
             "provider": "Adzuna Developer API",
             "name": self.name,
@@ -88,8 +116,8 @@ class AdzunaJobProvider(JobProvider):
         safe_keywords = re.sub(r'\s+', ' ', safe_keywords).strip()
 
         params: Dict[str, Any] = {
-            "app_id": settings.ADZUNA_APP_ID.strip(),
-            "app_key": settings.ADZUNA_APP_KEY.strip(),
+            "app_id": self.app_id,
+            "app_key": self.app_key,
             "results_per_page": min(query.limit, 50),
             "content-type": "application/json"
         }

@@ -529,7 +529,7 @@ class TestRecommendationJourneyE2E(unittest.TestCase):
         if not app_id or not app_key or app_id == "your_adzuna_app_id_here":
             self.skipTest("Adzuna API credentials not configured in environment. Skipping live network smoke test.")
 
-        from app.services.job_providers.adzuna import AdzunaJobProvider
+        from app.services.job_providers.adzuna_provider import AdzunaJobProvider
         from app.services.job_providers.base import JobSearchQuery
 
         provider = AdzunaJobProvider(app_id=app_id, app_key=app_key, default_country="in")
