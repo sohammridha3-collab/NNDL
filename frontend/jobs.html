@@ -90,19 +90,80 @@
             </div>
           </div>
 
-          <!-- Résumé Extraction Option -->
-          <div style="background: var(--bg-surface-2); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); margin-bottom: var(--space-4); display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; justify-content: space-between; border: 1px solid var(--border-subtle);">
-            <div style="display: flex; align-items: center; gap: var(--space-2); flex: 1; min-width: 260px;">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              <label for="rec-resume-select" style="font-size: var(--font-size-xs); font-weight: var(--font-weight-medium); white-space: nowrap;">Extract from Résumé:</label>
-              <select id="rec-resume-select" class="select select--sm" style="flex: 1; max-width: 320px;">
-                <option value="">— Choose a stored résumé —</option>
-              </select>
+          <!-- Résumé Input & Extraction Options -->
+          <div style="background: var(--bg-surface-2); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); margin-bottom: var(--space-4); border: 1px solid var(--border-subtle);">
+            <div style="display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: var(--space-2); flex: 1; min-width: 260px;">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <label for="rec-resume-select" style="font-size: var(--font-size-xs); font-weight: var(--font-weight-medium); white-space: nowrap;">Extract from Résumé:</label>
+                <select id="rec-resume-select" class="select select--sm" style="flex: 1; max-width: 300px;">
+                  <option value="">— Choose a stored résumé —</option>
+                </select>
+              </div>
+
+              <div style="display: flex; gap: var(--space-2); align-items: center;">
+                <input type="file" id="rec-resume-file-input" accept=".pdf,.docx,.txt" style="display: none;">
+                <button type="button" id="rec-upload-file-btn" class="btn btn--ghost btn--sm">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  <span id="rec-upload-file-btn-text">Upload File (.pdf/.docx)</span>
+                </button>
+                <button type="button" id="toggle-paste-resume-btn" class="btn btn--ghost btn--sm">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                  <span>Paste Text</span>
+                </button>
+                <button type="button" id="extract-skills-btn" class="btn btn--secondary btn--sm">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <span>Extract &amp; Summarize Profile</span>
+                </button>
+              </div>
             </div>
-            <button type="button" id="extract-skills-btn" class="btn btn--secondary btn--sm">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              <span>Extract Résumé Skills</span>
-            </button>
+
+            <!-- Optional Paste Resume Text Box (Collapsed by default) -->
+            <div id="rec-resume-paste-container" style="display: none; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px dashed var(--border-subtle);">
+              <label for="rec-resume-paste-text" class="field__label" style="font-size: var(--font-size-xs);">Paste Résumé Plain Text (Direct OCR / Copy-Paste Recovery):</label>
+              <textarea id="rec-resume-paste-text" class="input" rows="4" placeholder="Paste your résumé text here if your PDF is an unreadable/scanned image…"></textarea>
+            </div>
+          </div>
+
+          <!-- Recovery Alert Banner (Triggered on scanned/unreadable documents) -->
+          <div id="resume-recovery-alert" style="display: none; margin-bottom: var(--space-4);"></div>
+
+          <!-- Confirmed Profile Summary Preview Card -->
+          <div id="profile-summary-preview" style="display: none; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: var(--space-4); margin-bottom: var(--space-4);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-3);">
+              <div>
+                <h4 style="font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--text-primary); display: flex; align-items: center; gap: var(--space-2);">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--color-primary)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  Confirmed Candidate Profile &amp; Search Focus
+                </h4>
+                <p style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                  Review and edit before matching. <strong>Zero PII guarantee:</strong> candidate name, contact details, and full résumé are never transmitted to external job providers.
+                </p>
+              </div>
+              <div id="profile-tenure-badge" class="badge badge--neutral" style="font-size: 11px;">
+                Experience: 0.0 yrs
+              </div>
+            </div>
+
+            <!-- Profile Summary Grid -->
+            <div class="grid grid--cols-2" style="gap: var(--space-3); margin-bottom: var(--space-3);">
+              <div class="field" style="margin-bottom: 0;">
+                <label class="field__label" for="rec-preferred-titles-input" style="font-size: 11px;">
+                  Target / Preferred Role Titles (Editable search keywords)
+                </label>
+                <input class="input input--sm" type="text" id="rec-preferred-titles-input" placeholder="e.g. Software Engineer, Backend Developer, Data Scientist">
+                <div id="detected-titles-pills" style="display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap;"></div>
+              </div>
+
+              <div class="field" style="margin-bottom: 0;">
+                <label class="field__label" style="font-size: 11px;">
+                  Calculated Non-Overlapping Employment History
+                </label>
+                <div id="profile-employment-list" style="max-height: 80px; overflow-y: auto; font-size: 11px; color: var(--text-secondary); background: var(--bg-surface-2); padding: var(--space-2); border-radius: var(--radius-sm);">
+                  <em>No employment records loaded yet.</em>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Interactive Editable Skill Chips Container -->

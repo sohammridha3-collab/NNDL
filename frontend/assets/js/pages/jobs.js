@@ -33,7 +33,9 @@ let currentMode = "recommendations";
 // Skill-Based Recommendations Filter State
 let skillFilter = {
   skills: ["Python", "SQL", "Docker", "Machine Learning"],
+  preferred_titles: [],
   resume_id: "",
+  resume_text: "",
   location: "",
   job_type: "",
   experience_level: "",
@@ -264,6 +266,13 @@ function setupRecommendationsControls() {
   const resetBtn = $("#reset-recommendations-btn");
   const extractBtn = $("#extract-skills-btn");
   const resumeSelect = $("#rec-resume-select");
+  const uploadBtn = $("#rec-upload-file-btn");
+  const fileInput = $("#rec-resume-file-input");
+  const uploadText = $("#rec-upload-file-btn-text");
+  const togglePasteBtn = $("#toggle-paste-resume-btn");
+  const pasteContainer = $("#rec-resume-paste-container");
+  const pasteTextEl = $("#rec-resume-paste-text");
+  const prefTitlesInput = $("#rec-preferred-titles-input");
   const locInput = $("#rec-location-input");
   const arrSelect = $("#rec-arrangement-select");
   const expSelect = $("#rec-experience-select");
@@ -274,29 +283,63 @@ function setupRecommendationsControls() {
     skillFilter.resume_id = resumeSelect.value;
   });
 
-  extractBtn?.addEventListener("click", async () => {
-    const resumeId = resumeSelect?.value || skillFilter.resume_id;
-    if (!resumeId) {
-      toast("Please select a stored résumé first to extract skills.", { type: "info" });
-      return;
-    }
-    setBusy(extractBtn, true, "Extracting…");
+  // Direct File Upload handler
+  uploadBtn?.addEventListener("click", () => {
+    fileInput?.click();
+  });
+
+  fileInput?.addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (uploadText) uploadText.textContent = `Uploading ${file.name}…`;
     try {
-      const res = await Api.recommendations.extractSkills({ resume_id: resumeId });
-      if (res.skills && res.skills.length > 0) {
-        res.skills.forEach((s) => addSkill(s));
-        toast(`Extracted ${res.count} canonical skills from résumé!`, { type: "success" });
-      } else {
-        toast("No recognizable technical skills found in this résumé.", { type: "info" });
+      const uploaded = await Api.resumes.upload(file);
+      userResumes.push(uploaded);
+      if (resumeSelect) {
+        const opt = h("option", { value: uploaded.id, selected: true }, `${uploaded.file_name} (${uploaded.ats_score}% ATS)`);
+        resumeSelect.appendChild(opt);
+        resumeSelect.value = uploaded.id;
       }
+      skillFilter.resume_id = uploaded.id;
+      if (uploadText) uploadText.textContent = file.name;
+      toast(`Uploaded ${file.name}. Summarizing profile…`, { type: "success" });
+      await handleProfileSummaryExtraction();
     } catch (err) {
-      toast(errorMessage(err, "Failed to extract skills from résumé."), { type: "error" });
-    } finally {
-      setBusy(extractBtn, false);
+      if (uploadText) uploadText.textContent = "Upload File (.pdf/.docx)";
+      toast(errorMessage(err, "Failed to upload résumé file."), { type: "error" });
     }
   });
 
+  // Toggle Plain-Text Paste Container
+  togglePasteBtn?.addEventListener("click", () => {
+    if (pasteContainer) {
+      const isHidden = pasteContainer.style.display === "none";
+      pasteContainer.style.display = isHidden ? "block" : "none";
+      if (isHidden) pasteTextEl?.focus();
+    }
+  });
+
+  // Preferred Titles input change
+  prefTitlesInput?.addEventListener("input", () => {
+    skillFilter.preferred_titles = prefTitlesInput.value
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+  });
+
+  // Extract & Profile Summary Button
+  extractBtn?.addEventListener("click", async () => {
+    await handleProfileSummaryExtraction();
+  });
+
   findBtn?.addEventListener("click", () => {
+    if (prefTitlesInput) {
+      skillFilter.preferred_titles = prefTitlesInput.value
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+    }
     skillFilter.location = locInput ? locInput.value.trim() : "";
     skillFilter.job_type = arrSelect ? arrSelect.value : "";
     skillFilter.experience_level = expSelect ? expSelect.value : "";
@@ -308,7 +351,9 @@ function setupRecommendationsControls() {
 
   resetBtn?.addEventListener("click", () => {
     skillFilter.skills = ["Python", "SQL", "Docker", "Machine Learning"];
+    skillFilter.preferred_titles = [];
     skillFilter.resume_id = "";
+    skillFilter.resume_text = "";
     skillFilter.location = "";
     skillFilter.job_type = "";
     skillFilter.experience_level = "";
@@ -323,6 +368,15 @@ function setupRecommendationsControls() {
     if (catSelect) catSelect.value = "";
     if (extCheck) extCheck.checked = true;
     if (resumeSelect) resumeSelect.value = "";
+    if (prefTitlesInput) prefTitlesInput.value = "";
+    if (pasteTextEl) pasteTextEl.value = "";
+    const previewContainer = $("#profile-summary-preview");
+    if (previewContainer) previewContainer.style.display = "none";
+    const alertContainer = $("#resume-recovery-alert");
+    if (alertContainer) {
+      alertContainer.style.display = "none";
+      alertContainer.replaceChildren();
+    }
 
     loadSkillRecommendations();
   });
@@ -348,6 +402,193 @@ function setupRecommendationsControls() {
 }
 
 /* ==============================================================================
+ * Résumé Profile Extraction & Summary Handler
+ * ============================================================================== */
+async function handleProfileSummaryExtraction() {
+  const extractBtn = $("#extract-skills-btn");
+  const resumeSelect = $("#rec-resume-select");
+  const pasteTextEl = $("#rec-resume-paste-text");
+  const alertContainer = $("#resume-recovery-alert");
+  const previewContainer = $("#profile-summary-preview");
+  const prefTitlesInput = $("#rec-preferred-titles-input");
+  const titlesPills = $("#detected-titles-pills");
+  const employmentList = $("#profile-employment-list");
+  const tenureBadge = $("#profile-tenure-badge");
+  const locInput = $("#rec-location-input");
+
+  const pastedText = pasteTextEl ? pasteTextEl.value.trim() : "";
+  const selectedResumeId = resumeSelect ? resumeSelect.value : skillFilter.resume_id;
+
+  if (!pastedText && !selectedResumeId) {
+    toast("Please select a stored résumé, upload a file, or paste résumé text.", { type: "info" });
+    return;
+  }
+
+  setBusy(extractBtn, true, "Analyzing Profile…");
+  try {
+    const payload = {
+      resume_id: selectedResumeId || undefined,
+      resume_text: pastedText || undefined
+    };
+
+    const res = await Api.recommendations.profileSummary(payload);
+
+    // Scanned or unreadable document recovery check
+    if (res.is_scanned || res.recovery_needed) {
+      if (alertContainer) {
+        alertContainer.style.display = "block";
+        alertContainer.replaceChildren(
+          notice(
+            "warning",
+            "Scanned / Image-Based PDF Detected",
+            res.recovery_message || "This résumé lacks a searchable text layer. To get accurate match recommendations, please paste your résumé text below or upload a text-searchable PDF/DOCX.",
+            h("div", { style: { marginTop: "var(--space-2)" } },
+              h("button", {
+                type: "button",
+                class: "btn btn--sm btn--secondary",
+                onclick: () => {
+                  const pasteBox = $("#rec-resume-paste-container");
+                  if (pasteBox) {
+                    pasteBox.style.display = "block";
+                    pasteTextEl?.focus();
+                  }
+                }
+              }, "Paste Plain Text")
+            )
+          )
+        );
+      }
+      if (previewContainer) previewContainer.style.display = "none";
+      toast("Scanned document detected. Please paste text or upload a searchable file.", { type: "warning" });
+      return;
+    }
+
+    // Document is readable and parsed
+    if (alertContainer) {
+      alertContainer.style.display = "none";
+      alertContainer.replaceChildren();
+    }
+
+    // Save extracted text for neural matching
+    skillFilter.resume_text = res.raw_text || pastedText;
+    if (selectedResumeId) skillFilter.resume_id = selectedResumeId;
+
+    // Merge extracted canonical skills into chips
+    if (res.skills && res.skills.length > 0) {
+      res.skills.forEach((s) => addSkill(s));
+    }
+
+    // Update non-overlapping tenure badge
+    if (tenureBadge) {
+      tenureBadge.textContent = `Experience: ${res.total_experience_years.toFixed(1)} yrs (non-overlapping)`;
+    }
+
+    // Update role titles
+    const titles = res.detected_titles || [];
+    if (res.primary_role && !titles.includes(res.primary_role)) {
+      titles.unshift(res.primary_role);
+    }
+    skillFilter.preferred_titles = titles;
+
+    if (prefTitlesInput) {
+      prefTitlesInput.value = titles.join(", ");
+    }
+
+    // Render detected titles pills
+    if (titlesPills) {
+      titlesPills.replaceChildren(
+        ...titles.map((t) => {
+          return h("button", {
+            type: "button",
+            class: "btn-tag",
+            onclick: () => {
+              const current = (prefTitlesInput?.value || "").split(",").map((x) => x.trim()).filter(Boolean);
+              if (!current.includes(t)) {
+                current.push(t);
+                if (prefTitlesInput) prefTitlesInput.value = current.join(", ");
+                skillFilter.preferred_titles = current;
+              }
+            }
+          }, `+ ${t}`);
+        })
+      );
+    }
+
+    // Render non-overlapping employment history list
+    if (employmentList) {
+      if (res.employment_history && res.employment_history.length > 0) {
+        employmentList.replaceChildren(
+          h("ul", { style: { margin: 0, paddingLeft: "1.2rem", listStyle: "disc" } },
+            ...res.employment_history.map((e) => {
+              const dates = `${e.start_date || "N/A"} – ${e.end_date || (e.is_current ? "Present" : "N/A")}`;
+              const dur = e.duration_months ? ` (${e.duration_months} mos)` : "";
+              return h("li", { style: { marginBottom: "2px" } },
+                h("strong", {}, e.title || "Role"),
+                document.createTextNode(` at ${e.company || "Organization"} • ${dates}${dur}`)
+              );
+            })
+          )
+        );
+      } else {
+        employmentList.replaceChildren(
+          document.createTextNode(`Evaluated overall technical profile (${res.total_experience_years.toFixed(1)} yrs calculated tenure).`)
+        );
+      }
+    }
+
+    // Autofill detected location if input is empty
+    if (res.detected_location && locInput && !locInput.value.trim()) {
+      locInput.value = res.detected_location;
+      skillFilter.location = res.detected_location;
+    }
+
+    if (previewContainer) {
+      previewContainer.style.display = "block";
+    }
+
+    toast(`Profile extracted! Verified ${res.skills.length} skills and ${res.total_experience_years.toFixed(1)} yrs experience.`, { type: "success" });
+  } catch (err) {
+    toast(errorMessage(err, "Failed to analyze résumé profile."), { type: "error" });
+  } finally {
+    setBusy(extractBtn, false);
+  }
+}
+
+/* ==============================================================================
+ * Broadening Suggestions Handler (Explicit User-Controlled Broadening)
+ * ============================================================================== */
+function applyBroadeningSuggestion(sug) {
+  const locInput = $("#rec-location-input");
+  const arrSelect = $("#rec-arrangement-select");
+  const expSelect = $("#rec-experience-select");
+  const catSelect = $("#rec-category-select");
+
+  const sugLower = (sug || "").toLowerCase();
+  if (sugLower.includes("clear location") || sugLower.includes("any location")) {
+    if (locInput) locInput.value = "";
+    skillFilter.location = "";
+  } else if (sugLower.includes("remote")) {
+    if (arrSelect) arrSelect.value = "remote";
+    skillFilter.job_type = "remote";
+  } else if (sugLower.includes("arrangement")) {
+    if (arrSelect) arrSelect.value = "";
+    skillFilter.job_type = "";
+  } else if (sugLower.includes("experience")) {
+    if (expSelect) expSelect.value = "";
+    skillFilter.experience_level = "";
+  } else if (sugLower.includes("category")) {
+    if (catSelect) catSelect.value = "";
+    skillFilter.category = "";
+  } else if (sugLower.includes("skill") || sugLower.includes("broaden")) {
+    if (catSelect) catSelect.value = "";
+    skillFilter.category = "";
+  }
+  skillFilter.offset = 0;
+  loadSkillRecommendations();
+  toast(`Applied suggestion: "${sug}"`, { type: "info" });
+}
+
+/* ==============================================================================
  * Load Skill-Based Recommendations
  * ============================================================================== */
 async function loadSkillRecommendations() {
@@ -362,7 +603,9 @@ async function loadSkillRecommendations() {
   try {
     const payload = {
       skills: skillFilter.skills,
+      preferred_titles: skillFilter.preferred_titles,
       resume_id: skillFilter.resume_id || undefined,
+      resume_text: skillFilter.resume_text || undefined,
       location: skillFilter.location || undefined,
       job_type: skillFilter.job_type || undefined,
       experience_level: skillFilter.experience_level || undefined,
@@ -419,9 +662,52 @@ async function loadSkillRecommendations() {
     }
 
     if (!res.items || res.items.length === 0) {
-      container.replaceChildren(
-        emptyState("No matching vacancies found for these skills and filters. Try adding more skills or broadening location.")
+      const suggestions = res.broadening_suggestions || [];
+      const emptyCard = h("div", {
+        class: "card",
+        style: {
+          textAlign: "center",
+          padding: "var(--space-6) var(--space-4)",
+          maxWidth: "680px",
+          margin: "0 auto"
+        }
+      },
+        h("div", { style: { marginBottom: "var(--space-2)", color: "var(--text-muted)" } }, icon("search", { size: 36 })),
+        h("h3", { style: { fontSize: "var(--font-size-base)", fontWeight: "600", marginBottom: "var(--space-2)" } },
+          "No Matching Vacancies Found"
+        ),
+        h("p", { style: { fontSize: "var(--font-size-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)", lineHeight: "1.5" } },
+          res.empty_reason || "No vacancies match all your current skills and filters."
+        ),
+        suggestions.length > 0 ? h("div", {
+          style: {
+            background: "var(--bg-surface-2)",
+            padding: "var(--space-3) var(--space-4)",
+            borderRadius: "var(--radius-md)",
+            textAlign: "left",
+            marginBottom: "var(--space-4)",
+            border: "1px solid var(--border-subtle)"
+          }
+        },
+          h("div", { style: { fontSize: "11px", fontWeight: "600", color: "var(--text-primary)", marginBottom: "var(--space-2)", textTransform: "uppercase" } },
+            "Suggested Options to Broaden Search (No Silent Relaxation):"
+          ),
+          h("div", { style: { display: "flex", flexWrap: "wrap", gap: "var(--space-2)" } },
+            ...suggestions.map((sug) => {
+              return h("button", {
+                type: "button",
+                class: "btn btn--sm btn--secondary",
+                onclick: () => applyBroadeningSuggestion(sug)
+              }, sug);
+            })
+          )
+        ) : null,
+        h("p", { style: { fontSize: "11px", color: "var(--text-muted)", margin: 0 } },
+          "Preferences are strictly respected. We never silently relax your filters without your confirmation."
+        )
       );
+
+      container.replaceChildren(emptyCard);
       if (paginationContainer) paginationContainer.replaceChildren();
       return;
     }
@@ -558,25 +844,64 @@ function renderJobCards(container, jobs, isRecommendationMode = false) {
 
     // Score Badge (for recommendations)
     let scoreBadgeEl = null;
-    if (isRecommendationMode && j.score !== undefined) {
-      const isStrong = /strong|high/i.test(j.classification || "");
-      scoreBadgeEl = h("div", {
-        style: {
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "4px",
-          padding: "2px 8px",
-          borderRadius: "var(--radius-full)",
-          fontSize: "11px",
-          fontWeight: "600",
-          background: isStrong ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)",
-          color: isStrong ? "var(--color-success)" : "var(--color-warning)",
-          border: `1px solid ${isStrong ? "rgba(16, 185, 129, 0.3)" : "rgba(245, 158, 11, 0.3)"}`
-        }
-      },
-        icon("sparkles", { size: 11 }),
-        document.createTextNode(`${j.score_label || "Match Fit"}: ${j.score}%`)
-      );
+    if (isRecommendationMode) {
+      if (j.score_type === "model_probability_percent") {
+        const isStrong = /strong|high/i.test(j.classification || "") || j.score >= 60;
+        scoreBadgeEl = h("div", {
+          style: {
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+            padding: "2px 8px",
+            borderRadius: "var(--radius-full)",
+            fontSize: "11px",
+            fontWeight: "600",
+            background: isStrong ? "rgba(16, 185, 129, 0.15)" : "rgba(59, 130, 246, 0.15)",
+            color: isStrong ? "var(--color-success)" : "var(--color-primary)",
+            border: `1px solid ${isStrong ? "rgba(16, 185, 129, 0.3)" : "rgba(59, 130, 246, 0.3)"}`
+          },
+          title: "Evaluated using full PyTorch neural match network"
+        },
+          icon("sparkles", { size: 11 }),
+          document.createTextNode(`AI Résumé Match: ${j.score}%`)
+        );
+      } else if (j.score_type === "skills_only_relevance") {
+        scoreBadgeEl = h("div", {
+          style: {
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+            padding: "2px 8px",
+            borderRadius: "var(--radius-full)",
+            fontSize: "11px",
+            fontWeight: "600",
+            background: "rgba(245, 158, 11, 0.15)",
+            color: "var(--color-warning)",
+            border: "1px solid rgba(245, 158, 11, 0.3)"
+          },
+          title: "Calculated based solely on skill chip overlap & semantic relevance"
+        },
+          icon("sparkles", { size: 11 }),
+          document.createTextNode(`Skills Relevance: ${j.score}%`)
+        );
+      } else if (j.score_type === "unranked_sparse_description") {
+        scoreBadgeEl = h("div", {
+          class: "badge badge--neutral",
+          style: { fontSize: "10px" },
+          title: "Posting description too short for deep neural compatibility analysis"
+        }, "Unranked (Brief Description)");
+      } else if (j.score_type === "unranked_inference_unavailable") {
+        scoreBadgeEl = h("div", {
+          class: "badge badge--neutral",
+          style: { fontSize: "10px" },
+          title: "Neural inference unavailable; preserved as genuine unranked vacancy"
+        }, "Unranked (Inference Unavailable)");
+      } else if (j.score !== undefined) {
+        scoreBadgeEl = h("div", {
+          class: "badge badge--neutral",
+          style: { fontSize: "11px" }
+        }, `${j.score_label || "Score"}: ${j.score}%`);
+      }
     }
 
     // Skills Display
@@ -629,7 +954,7 @@ function renderJobCards(container, jobs, isRecommendationMode = false) {
           style: {
             fontSize: "var(--font-size-xs)",
             color: "var(--text-secondary)",
-            marginBottom: "var(--space-3)",
+            marginBottom: "var(--space-2)",
             display: "flex",
             alignItems: "center",
             gap: "var(--space-3)",
@@ -642,6 +967,19 @@ function renderJobCards(container, jobs, isRecommendationMode = false) {
           j.posted_date ? h("span", { style: { color: "var(--text-muted)" } }, `• ${j.posted_date}`) : null
         ),
 
+        // Experience Requirements (if available)
+        j.experience_requirements ? h("div", {
+          style: {
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+            fontSize: "11px",
+            color: "var(--color-primary)",
+            fontWeight: "500",
+            marginBottom: "var(--space-2)"
+          }
+        }, icon("briefcase", { size: 12 }), document.createTextNode(` ${j.experience_requirements}`)) : null,
+
         // Relevance Explanation (if recommendation)
         j.relevance_explanation ? h("div", {
           style: {
@@ -651,10 +989,30 @@ function renderJobCards(container, jobs, isRecommendationMode = false) {
             borderLeft: "3px solid var(--color-primary)",
             fontSize: "11px",
             color: "var(--text-secondary)",
-            marginBottom: "var(--space-3)",
+            marginBottom: "var(--space-2)",
             lineHeight: "1.4"
           }
         }, j.relevance_explanation) : null,
+
+        // Qualification Breakdown (Required vs Preferred)
+        isRecommendationMode && j.qualification_breakdown && (j.qualification_breakdown.required?.length || j.qualification_breakdown.preferred?.length) ? h("div", {
+          style: {
+            fontSize: "11px",
+            background: "var(--bg-surface-2)",
+            padding: "var(--space-2)",
+            borderRadius: "var(--radius-sm)",
+            marginBottom: "var(--space-2)"
+          }
+        },
+          j.qualification_breakdown.required?.length ? h("div", { style: { marginBottom: j.qualification_breakdown.preferred?.length ? "4px" : "0" } },
+            h("strong", { style: { color: "var(--text-primary)" } }, "Required: "),
+            document.createTextNode(j.qualification_breakdown.required.slice(0, 3).join(", ") + (j.qualification_breakdown.required.length > 3 ? ` +${j.qualification_breakdown.required.length - 3} more` : ""))
+          ) : null,
+          j.qualification_breakdown.preferred?.length ? h("div", {},
+            h("strong", { style: { color: "var(--text-muted)" } }, "Preferred: "),
+            document.createTextNode(j.qualification_breakdown.preferred.slice(0, 3).join(", ") + (j.qualification_breakdown.preferred.length > 3 ? ` +${j.qualification_breakdown.preferred.length - 3} more` : ""))
+          ) : null
+        ) : null,
 
         // Skills Breakdown Chips
         isRecommendationMode ? h("div", { style: { marginBottom: "var(--space-3)" } },
@@ -666,7 +1024,18 @@ function renderJobCards(container, jobs, isRecommendationMode = false) {
           ) : null
         ) : (generalSkills.length > 0 ? h("div", { class: "chip-list", style: { marginBottom: "var(--space-3)" } },
           ...generalSkills.slice(0, 5).map((s) => chip(s))
-        ) : null)
+        ) : null),
+
+        // Hiring Disclaimer
+        isRecommendationMode ? h("p", {
+          style: {
+            fontSize: "10px",
+            color: "var(--text-muted)",
+            margin: "var(--space-2) 0 0 0",
+            fontStyle: "italic",
+            lineHeight: "1.3"
+          }
+        }, j.disclaimer || "This score estimates résumé–job compatibility according to the model’s training labels. It is not the probability of being hired.") : null
       ),
 
       // Footer Actions

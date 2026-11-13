@@ -6,6 +6,8 @@ from app.api.deps import get_current_user, get_optional_user, require_role
 from app.db.session import get_db
 from app.models.models import Job, Resume, User
 from app.schemas.schemas import (
+    ResumeProfileSummaryRequest,
+    ResumeProfileSummaryResponse,
     SkillExtractionRequest,
     SkillExtractionResponse,
     SkillRecommendationRequest,
@@ -14,6 +16,25 @@ from app.schemas.schemas import (
 from app.services.recommendation_service import RecommendationService
 
 router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
+
+
+@router.post("/profile-summary", response_model=ResumeProfileSummaryResponse)
+def get_resume_profile_summary(
+    request: ResumeProfileSummaryRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Parses an uploaded or stored résumé into a confirmed, editable profile summary:
+    - Identifies scanned/unreadable documents and provides recovery instructions.
+    - Extracts skills, non-overlapping employment tenure, and possible role titles.
+    - Previews candidate qualifications before initiating focused job search queries.
+    """
+    return RecommendationService.extract_profile_summary_from_resume(
+        db=db,
+        request=request,
+        current_user=current_user
+    )
 
 
 @router.post("/skills", response_model=SkillRecommendationResponse)

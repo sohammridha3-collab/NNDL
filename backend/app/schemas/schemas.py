@@ -273,6 +273,39 @@ class SkillExtractionResponse(BaseModel):
     count: int
 
 
+# ==========================================
+# RESUME PROFILE SUMMARY SCHEMAS
+# ==========================================
+class EmploymentHistoryItem(BaseModel):
+    title: str
+    company: str
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    duration_months: int = 0
+    description: Optional[str] = None
+
+
+class ResumeProfileSummaryRequest(BaseModel):
+    resume_id: Optional[str] = None
+    resume_text: Optional[str] = None
+
+
+class ResumeProfileSummaryResponse(BaseModel):
+    readable: bool = True
+    is_scanned: bool = False
+    recovery_needed: bool = False
+    recovery_message: Optional[str] = None
+    raw_text: str = ""
+    summary: Optional[str] = None
+    primary_role: Optional[str] = None
+    detected_titles: List[str] = Field(default_factory=list)
+    skills: List[str] = Field(default_factory=list)
+    total_experience_years: float = 0.0
+    employment_history: List[EmploymentHistoryItem] = Field(default_factory=list)
+    education: List[str] = Field(default_factory=list)
+    detected_location: Optional[str] = None
+
+
 class JobRecommendationItem(BaseModel):
     id: Optional[str] = None
     job_code: Optional[str] = None
@@ -291,24 +324,29 @@ class JobRecommendationItem(BaseModel):
     source_label: str  # "Curated Dataset Listing" or "Live Vacancy (Adzuna)"
     external_url: Optional[str] = None
     score: float  # 0 to 100
-    score_type: str  # "skills_only_relevance" or "model_probability_percent"
+    score_type: str  # "skills_only_relevance" or "model_probability_percent" or "unranked_sparse_description"
     score_label: str  # "Skills-Only Relevance" or "AI Résumé-Job Match Fit"
     classification: Optional[str] = None
     semantic_similarity: float
     skill_coverage: float
     matched_skills: List[str]
     missing_skills: List[str]
+    experience_requirements: Optional[str] = None
+    qualification_breakdown: Optional[Dict[str, List[str]]] = None
     relevance_explanation: str
+    disclaimer: str = "This score estimates résumé–job compatibility according to the model’s training labels. It is not the probability of being hired."
     is_saved: bool = False
 
 
 class SkillRecommendationRequest(BaseModel):
     skills: List[str] = Field(default_factory=list)
+    preferred_titles: List[str] = Field(default_factory=list)
     resume_id: Optional[str] = None
     resume_text: Optional[str] = None
     category: Optional[str] = None
     job_type: Optional[str] = None
     location: Optional[str] = None
+    country: str = "in"
     experience_level: Optional[str] = None
     min_salary: Optional[float] = None
     limit: int = Field(default=12, ge=1, le=50)
@@ -324,6 +362,9 @@ class SkillRecommendationResponse(BaseModel):
     has_resume_context: bool
     api_status: Dict[str, Any]
     items: List[JobRecommendationItem]
+    empty_reason: Optional[str] = None
+    broadening_suggestions: List[str] = Field(default_factory=list)
+    queries_executed: List[str] = Field(default_factory=list)
 
 
 

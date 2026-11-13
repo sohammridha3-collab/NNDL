@@ -392,7 +392,8 @@ export const Api = {
     candidates: (jobId, limit = 10, opts = {}) =>
       http.get("/recommendations/candidates", { timeout: CONFIG.INFERENCE_TIMEOUT_MS, ...opts, query: { job_id: jobId, limit } }),
     bySkills: (payload, opts = {}) => http.post("/recommendations/skills", payload, { timeout: CONFIG.INFERENCE_TIMEOUT_MS, ...opts }),
-    extractSkills: (payload, opts = {}) => http.post("/recommendations/extract-skills", payload, opts)
+    extractSkills: (payload, opts = {}) => http.post("/recommendations/extract-skills", payload, opts),
+    profileSummary: (payload, opts = {}) => http.post("/recommendations/profile-summary", payload, opts)
   },
   dashboard: {
     candidate: (opts) => http.get("/dashboard/candidate", opts),
