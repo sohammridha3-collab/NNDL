@@ -233,6 +233,46 @@ def create_job(
     )
 
 
+@router.get("/live/status")
+def get_live_jobs_status():
+    """Diagnostic status of external job providers (Adzuna & Remotive) with setup guide."""
+    from app.services.job_providers.registry import registry
+    return registry.get_providers_status()
+
+
+@router.get("/live/search")
+def search_live_jobs(
+    q: Optional[str] = Query(None, description="Keywords: job title, skill, or role"),
+    location: Optional[str] = Query(None, description="City or region (e.g. Kolkata, Delhi, Bengaluru, Remote)"),
+    country: str = Query("in", description="Country code (default 'in' for India)"),
+    work_arrangement: Optional[str] = Query(None, description="remote, hybrid, or on-site"),
+    experience_level: Optional[str] = Query(None, description="Entry Level, Mid-Level, Senior Level, Lead / Principal"),
+    category: Optional[str] = Query(None, description="Category name"),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(12, ge=1, le=50, description="Items per page"),
+):
+    """
+    Search genuine live vacancies across connected authorized job APIs (Adzuna & Remotive).
+    Supports Indian cities (Kolkata, Delhi, Bengaluru, Mumbai, etc.) and worldwide remote vacancies.
+    Training dataset records are NEVER returned by this endpoint.
+    """
+    from app.services.job_providers.base import JobSearchQuery
+    from app.services.job_providers.registry import registry
+
+    query = JobSearchQuery(
+        keywords=q,
+        location=location,
+        country=country,
+        work_arrangement=work_arrangement,
+        experience_level=experience_level,
+        category=category,
+        page=page,
+        limit=limit,
+    )
+    result = registry.search_live_jobs(query)
+    return result
+
+
 @router.get("/{job_id}", response_model=JobResponse)
 def get_job(job_id: str, db: Session = Depends(get_db)):
     """Retrieve details of a single job opening."""

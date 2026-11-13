@@ -378,7 +378,9 @@ export const Api = {
     mine: (status = "all", opts = {}) => http.get("/jobs/recruiter/mine", { ...opts, query: { status } }),
     myApplications: (opts) => http.get("/jobs/applications/mine", opts),
     saved: (opts) => http.get("/jobs/saved/mine", opts),
-    saveExternal: (payload) => http.post("/jobs/save-external", payload)
+    saveExternal: (payload) => http.post("/jobs/save-external", payload),
+    liveStatus: (opts = {}) => http.get("/jobs/live/status", opts),
+    searchLive: (query, opts = {}) => http.get("/jobs/live/search", { ...opts, query })
   },
   matching: {
     predict: (payload, opts = {}) => http.post("/matching/predict", payload, { timeout: CONFIG.INFERENCE_TIMEOUT_MS, ...opts }),

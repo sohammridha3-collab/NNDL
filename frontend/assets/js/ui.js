@@ -223,12 +223,14 @@ export function skeleton(lines = 3) {
   );
 }
 
-export function emptyState({ title, message, action = null, iconName = "layers" }) {
+export function emptyState(opts = {}) {
+  const { title, message, action = null, iconName = "layers" } =
+    typeof opts === "string" ? { title: opts, message: "" } : (opts || {});
   return h(
     "div",
     { class: "state state--empty" },
     h("span", { class: "state__icon" }, icon(iconName, { size: 28 })),
-    h("h3", { class: "state__title", text: title }),
+    h("h3", { class: "state__title", text: title || "No items found" }),
     message ? h("p", { class: "state__text", text: message }) : null,
     action
   );
@@ -284,7 +286,8 @@ export function setBusy(button, busy, busyLabel = "Working…") {
 
 /* ---------------------------------------------------------------- Dialogs */
 let dialogSeq = 0;
-export function openDialog({ title, description = null, body, actions = [], size = "md", onClose = null, dismissible = true }) {
+export function openDialog({ title, description = null, body = null, content = null, actions = [], size = "md", onClose = null, dismissible = true }) {
+  const dialogBody = body || content;
   const opener = document.activeElement;
   const id = `dlg-${++dialogSeq}`;
   const dialog = h("dialog", { class: `dialog dialog--${size}`, "aria-labelledby": `${id}-title`, "aria-describedby": description ? `${id}-desc` : null });
@@ -311,7 +314,7 @@ export function openDialog({ title, description = null, body, actions = [], size
         )
       )
     : null;
-  append(dialog, [header, h("div", { class: "dialog__body" }, body), footer]);
+  append(dialog, [header, h("div", { class: "dialog__body" }, dialogBody), footer]);
   dialog.addEventListener("cancel", (e) => {
     e.preventDefault();
     if (dismissible) close(null);

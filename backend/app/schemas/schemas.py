@@ -377,3 +377,42 @@ class FairnessAuditResponse(BaseModel):
     counterfactual_sensitivity_results: List[Dict[str, Any]]
     overall_fairness_verdict: str
     recommendations: List[str]
+
+
+# ==========================================
+# LIVE EXTERNAL JOB PROVIDER SCHEMAS
+# ==========================================
+class LiveJobListingResponse(BaseModel):
+    source_id: str
+    source_provider: str
+    source_label: str
+    title: str
+    company_name: str
+    description: str
+    location: str
+    country: Optional[str] = None
+    available_requirements: List[str] = Field(default_factory=list)
+    source_url: Optional[str] = None
+    application_url: Optional[str] = None
+    posting_date: Optional[str] = None
+    expiry_date: Optional[str] = None
+    min_salary: Optional[float] = None
+    max_salary: Optional[float] = None
+    salary_currency: Optional[str] = None
+    job_type: str = "on-site"
+    experience_level: Optional[str] = None
+    category: Optional[str] = None
+    retrieval_timestamp: Optional[str] = None
+    is_live: bool = True
+
+
+class LiveJobSearchResponse(BaseModel):
+    provider: str
+    status: str
+    message: str
+    total: int = 0
+    page: int = 1
+    limit: int = 12
+    items: List[LiveJobListingResponse] = Field(default_factory=list)
+    cached: bool = False
+

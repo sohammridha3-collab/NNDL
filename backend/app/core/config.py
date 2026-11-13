@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     # External Job API Configuration (Adzuna / Remotive)
     ADZUNA_APP_ID: str = os.getenv("ADZUNA_APP_ID", "")
     ADZUNA_APP_KEY: str = os.getenv("ADZUNA_APP_KEY", "")
-    ADZUNA_COUNTRY: str = os.getenv("ADZUNA_COUNTRY", "us")
+    ADZUNA_COUNTRY: str = os.getenv("ADZUNA_COUNTRY", "in")
     ENABLE_EXTERNAL_JOBS: bool = os.getenv("ENABLE_EXTERNAL_JOBS", "true").lower() in ("true", "1", "yes")
 
     @property

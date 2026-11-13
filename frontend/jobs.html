@@ -85,7 +85,7 @@
                 Enter skills as editable chips or extract them directly from your stored résumé. Matches against curated dataset listings and live authorized vacancies.
               </p>
             </div>
-            <div id="external-api-badge" class="badge badge--neutral" style="font-size: 11px;">
+            <div id="external-api-badge" class="badge badge--neutral" style="font-size: 11px; cursor: pointer;" title="Click to view Live API provider status & setup guide">
               Checking Job API…
             </div>
           </div>
@@ -136,7 +136,13 @@
           <div class="grid grid--cols-4" style="gap: var(--space-3); margin-bottom: var(--space-4);">
             <div class="field" style="margin-bottom: 0;">
               <label class="field__label" for="rec-location-input">Location</label>
-              <input class="input" type="text" id="rec-location-input" placeholder="e.g. Remote, New York, London…">
+              <input class="input" type="text" id="rec-location-input" placeholder="e.g. Kolkata, Delhi, Bengaluru, Remote…">
+              <div style="display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap;">
+                <button type="button" class="btn-tag" data-set-location="Kolkata">Kolkata</button>
+                <button type="button" class="btn-tag" data-set-location="Delhi">Delhi</button>
+                <button type="button" class="btn-tag" data-set-location="Bengaluru">Bengaluru</button>
+                <button type="button" class="btn-tag" data-set-location="Remote">Remote</button>
+              </div>
             </div>
 
             <div class="field" style="margin-bottom: 0;">
@@ -262,11 +268,13 @@
           </div>
         </div>
 
+        <!-- Provider Notice Banner -->
+        <div id="provider-notice-banner" style="display: none; margin-bottom: var(--space-4);"></div>
+
         <!-- Jobs Grid Container -->
         <div id="jobs-grid-container"></div>
 
         <!-- Jobs Pagination Container -->
-        <div id="jobs-pagination-container"></div>
         <div id="jobs-pagination-container"></div>
       </main>
     </div>

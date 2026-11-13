@@ -23,7 +23,8 @@ import {
   setBusy,
   toast,
   errorMessage,
-  debounce
+  debounce,
+  notice
 } from "../ui.js";
 
 // Active view mode: "recommendations" or "catalog"
@@ -325,6 +326,25 @@ function setupRecommendationsControls() {
 
     loadSkillRecommendations();
   });
+
+  // Quick location tags (Kolkata, Delhi, Bengaluru, Remote)
+  $$("[data-set-location]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const loc = btn.getAttribute("data-set-location");
+      if (locInput) {
+        locInput.value = loc;
+        skillFilter.location = loc;
+        skillFilter.offset = 0;
+        loadSkillRecommendations();
+      }
+    });
+  });
+
+  // External API status badge click -> modal
+  const apiBadge = $("#external-api-badge");
+  apiBadge?.addEventListener("click", () => {
+    openProviderSetupDialog();
+  });
 }
 
 /* ==============================================================================
@@ -358,12 +378,40 @@ async function loadSkillRecommendations() {
     if (apiBadge && res.api_status) {
       if (res.api_status.configured) {
         apiBadge.className = "badge badge--success";
-        apiBadge.textContent = "Live Vacancies: Adzuna Connected";
+        apiBadge.textContent = "Live Vacancies: Adzuna (India) Active";
       } else {
-        apiBadge.className = "badge badge--neutral";
-        apiBadge.textContent = "Live Vacancies: Remotive / Database";
+        apiBadge.className = "badge badge--warning";
+        apiBadge.textContent = "Live Vacancies: Setup Required (India)";
       }
-      apiBadge.title = res.api_status.message || "";
+      apiBadge.title = res.api_status.message || "Click for details and configuration guide";
+    }
+
+    // Inform user if searching Indian cities while Adzuna API is unconfigured
+    const noticeBanner = $("#provider-notice-banner");
+    const locLower = (skillFilter.location || "").toLowerCase();
+    const isIndianCity = ["kolkata", "delhi", "bengaluru", "bangalore", "mumbai", "pune", "hyderabad", "chennai", "india"].some(c => locLower.includes(c));
+
+    if (noticeBanner) {
+      if (isIndianCity && res.api_status && !res.api_status.configured) {
+        noticeBanner.style.display = "block";
+        noticeBanner.replaceChildren(
+          notice(
+            "info",
+            `Live Indian Vacancies Setup Required (${skillFilter.location})`,
+            `Live search across ${skillFilter.location} requires free Adzuna API credentials (ADZUNA_APP_ID / ADZUNA_APP_KEY in backend/.env). Currently showing verified dataset postings and Remotive remote tech vacancies. No fake vacancies are substituted.`,
+            h("div", { style: { marginTop: "var(--space-2)" } },
+              h("button", {
+                type: "button",
+                class: "btn btn--sm btn--primary",
+                onclick: () => openProviderSetupDialog()
+              }, "View 2-Min Adzuna Setup Steps")
+            )
+          )
+        );
+      } else {
+        noticeBanner.style.display = "none";
+        noticeBanner.replaceChildren();
+      }
     }
 
     if (countBadge) {
@@ -814,4 +862,136 @@ function renderPagination(container, total, limit, offset, onPageChange) {
       nextBtn
     )
   );
+}
+
+/* ==============================================================================
+ * Live Job Providers Diagnostic & Setup Dialog
+ * ============================================================================== */
+async function openProviderSetupDialog() {
+  let statusInfo = null;
+  try {
+    statusInfo = await Api.jobs.liveStatus();
+  } catch {
+    statusInfo = {
+      active: true,
+      india_live_retrieval_ready: false,
+      providers: {
+        adzuna: { configured: false, default_country: "in" },
+        remotive: { configured: true }
+      },
+      configuration_guide: {
+        setup_steps: [
+          "1. Register at https://developer.adzuna.com/signup",
+          "2. Copy Application ID & Application Key",
+          "3. Add ADZUNA_APP_ID and ADZUNA_APP_KEY to backend/.env",
+          "4. Restart backend server."
+        ]
+      }
+    };
+  }
+
+  const isConfigured = Boolean(statusInfo?.india_live_retrieval_ready);
+  const adzunaData = statusInfo?.providers?.adzuna || {};
+  const remotiveData = statusInfo?.providers?.remotive || {};
+
+  const bodyEl = h("div", { style: { display: "flex", flexDirection: "column", gap: "var(--space-4)" } },
+    // Adzuna Status Card
+    h("div", {
+      style: {
+        padding: "var(--space-3) var(--space-4)",
+        borderRadius: "var(--radius-md)",
+        background: isConfigured ? "rgba(16, 185, 129, 0.1)" : "rgba(245, 158, 11, 0.1)",
+        border: `1px solid ${isConfigured ? "rgba(16, 185, 129, 0.3)" : "rgba(245, 158, 11, 0.3)"}`
+      }
+    },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" } },
+        h("strong", { style: { color: isConfigured ? "var(--color-success)" : "var(--color-warning)" } },
+          isConfigured ? "Adzuna Developer API: Active" : "Adzuna Developer API: Unconfigured"
+        ),
+        h("span", { class: `badge badge--${isConfigured ? "success" : "warning"}` },
+          isConfigured ? "Connected (India Enabled)" : "Credentials Missing"
+        )
+      ),
+      h("p", { style: { fontSize: "var(--font-size-xs)", margin: "0", color: "var(--text-secondary)" } },
+        isConfigured
+          ? `Live job vacancies for Kolkata, Delhi, Bengaluru, and Indian metro hubs are active (Target Country: ${adzunaData.default_country?.toUpperCase() || "IN"}).`
+          : "Free API keys from Adzuna are required to retrieve genuine vacancies across Kolkata, Delhi, Bengaluru and other Indian locations. Training CSV records are strictly excluded from live vacancies."
+      )
+    ),
+
+    // Remotive Status Card
+    h("div", {
+      style: {
+        padding: "var(--space-3) var(--space-4)",
+        borderRadius: "var(--radius-md)",
+        background: "var(--bg-surface-2)",
+        border: "1px solid var(--border-subtle)"
+      }
+    },
+      h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" } },
+        h("strong", {}, "Remotive Open Jobs API: Companion Provider"),
+        h("span", { class: "badge badge--success" }, "Active (Public / Keyless)")
+      ),
+      h("p", { style: { fontSize: "var(--font-size-xs)", margin: "0", color: "var(--text-secondary)" } },
+        "Indexes worldwide verified remote technical roles. Available to candidates in India and globally."
+      )
+    ),
+
+    // Setup Instructions & Documentation Links
+    h("div", {},
+      h("h4", { style: { fontSize: "var(--font-size-sm)", fontWeight: "600", marginBottom: "var(--space-2)" } },
+        "How to Enable Live Indian Vacancies (Adzuna):"
+      ),
+      h("ol", { style: { fontSize: "var(--font-size-xs)", color: "var(--text-secondary)", paddingLeft: "1.2rem", lineHeight: "1.7" } },
+        h("li", {},
+          document.createTextNode("Register for a free developer account at "),
+          h("a", { href: "https://developer.adzuna.com/signup", target: "_blank", rel: "noopener", style: { color: "var(--color-primary)", textDecoration: "underline" } }, "developer.adzuna.com/signup"),
+          document.createTextNode(" (Instant access, free tier with 250+ calls/day).")
+        ),
+        h("li", {}, "Navigate to your developer dashboard and copy your Application ID and Application Key."),
+        h("li", {},
+          document.createTextNode("Add the variables to your "),
+          h("code", { style: { background: "var(--bg-surface-3)", padding: "2px 4px", borderRadius: "4px" } }, "backend/.env"),
+          document.createTextNode(" file:")
+        )
+      ),
+      h("pre", {
+        style: {
+          background: "var(--bg-surface-3)",
+          padding: "var(--space-3)",
+          borderRadius: "var(--radius-md)",
+          fontSize: "11px",
+          color: "var(--color-primary)",
+          overflowX: "auto",
+          marginTop: "6px"
+        }
+      }, "ADZUNA_APP_ID=your_adzuna_app_id_here\nADZUNA_APP_KEY=your_adzuna_app_key_here\nADZUNA_COUNTRY=in"),
+      h("p", { style: { fontSize: "11px", color: "var(--text-muted)", marginTop: "6px" } },
+        "Restart the backend server (python main.py). Real-time vacancies in Kolkata, Delhi, and Indian tech hubs will be fetched on demand."
+      )
+    ),
+
+    // Documentation Links
+    h("div", { style: { display: "flex", gap: "var(--space-3)", flexWrap: "wrap", fontSize: "var(--font-size-xs)", paddingTop: "var(--space-2)", borderTop: "1px solid var(--border-subtle)" } },
+      h("a", { href: "https://developer.adzuna.com/docs/search", target: "_blank", rel: "noopener", style: { color: "var(--color-primary)", display: "inline-flex", alignItems: "center", gap: "4px" } },
+        icon("globe", { size: 12 }), document.createTextNode("Adzuna API Official Documentation")
+      ),
+      h("a", { href: "https://remotive.com/api/remote-jobs", target: "_blank", rel: "noopener", style: { color: "var(--color-primary)", display: "inline-flex", alignItems: "center", gap: "4px" } },
+        icon("globe", { size: 12 }), document.createTextNode("Remotive API Official Documentation")
+      )
+    )
+  );
+
+  openDialog({
+    title: "Live Job Providers & API Configuration",
+    size: "md",
+    body: bodyEl,
+    actions: [
+      {
+        label: "Close",
+        variant: "primary",
+        onClick: (e, close) => close()
+      }
+    ]
+  });
 }
