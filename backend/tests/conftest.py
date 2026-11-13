@@ -1,23 +1,31 @@
 import os
 import sys
+from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 # Ensure backend root is on sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, BACKEND_ROOT)
+
+# Configure isolated test database BEFORE importing app.db.session or app.main
+TEST_DB_PATH = Path(BACKEND_ROOT) / "tests" / "test_isolated.db"
+TEST_DATABASE_URL = f"sqlite:///{TEST_DB_PATH.resolve().as_posix()}"
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+os.environ["ENVIRONMENT"] = "testing"
 
 from app.core.config import settings
+settings.DATABASE_URL = TEST_DATABASE_URL
+
 from app.core.security import create_access_token, get_password_hash
-from app.db.session import Base, get_db
+from app.db.session import Base, engine, get_db, SessionLocal
 from app.main import app
 from app.models.models import CandidateProfile, Company, Job, RecruiterProfile, User
 
-# Use test SQLite database
-TEST_DATABASE_URL = "sqlite:///./test_inclusive_ats.db"
-test_engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+test_engine = engine
+TestingSessionLocal = SessionLocal
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -27,8 +35,8 @@ def setup_test_db():
     yield
     Base.metadata.drop_all(bind=test_engine)
     try:
-        if os.path.exists("./test_inclusive_ats.db"):
-            os.remove("./test_inclusive_ats.db")
+        if TEST_DB_PATH.exists():
+            os.remove(TEST_DB_PATH)
     except Exception:
         pass
 

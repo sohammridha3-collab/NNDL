@@ -189,13 +189,18 @@ class RecommendationService:
         6. Keeps skills-only relevance separate from model compatibility.
         7. Returns evidence-based reasons, hiring disclaimer, or honest broadening suggestions if empty.
         """
-        inference_service = MLInferenceService.get_instance()
-        encoder = inference_service.encoder
-        vocab = inference_service.vocabulary
-
         # -------------------------------------------------------------
         # 1. Resolve Profile & Resume Context
         # -------------------------------------------------------------
+        # Resolve initial skills vocabulary safely (with fallback to DEFAULT_SKILLS)
+        vocab = DEFAULT_SKILLS
+        try:
+            inf_probe = MLInferenceService.get_instance()
+            if inf_probe and inf_probe.vocabulary:
+                vocab = inf_probe.vocabulary
+        except Exception as e:
+            logger.debug(f"Inference vocabulary unavailable during initial setup: {e}")
+
         resume_text = None
         if req.resume_text and len(req.resume_text.strip()) >= 20:
             resume_text = req.resume_text.strip()
@@ -377,11 +382,27 @@ class RecommendationService:
             saved_records = db.query(SavedJob.job_id).filter(SavedJob.user_id == current_user.id).all()
             saved_ids = {r[0] for r in saved_records}
 
+        # Resolve inference service and encoder safely
+        inference_service = None
+        encoder = None
+        try:
+            inference_service = MLInferenceService.get_instance()
+            if inference_service:
+                encoder = getattr(inference_service, "encoder", None)
+        except Exception as e:
+            logger.warning(f"Inference service unavailable for candidate ranking: {e}")
+
         # Encode candidate representation
         clean_resume_text = clean(resume_text, mask=True) if has_resume_context else None
         skills_text = f"Technical competencies: {', '.join(user_skills)}" if user_skills else "Software engineer technical qualifications"
         clean_skills_text = clean(skills_text, mask=True)
-        skills_emb = encoder.encode([clean_skills_text])[0]
+
+        skills_emb = None
+        if encoder is not None:
+            try:
+                skills_emb = encoder.encode([clean_skills_text])[0]
+            except Exception as e:
+                logger.warning(f"Could not encode skills text: {e}")
 
         scored_candidates: List[Dict[str, Any]] = []
 
@@ -396,9 +417,14 @@ class RecommendationService:
             overlap_ratio = float(len(matched_skills) / max(1, len(job_skills)))
 
             # Semantic similarity
-            job_emb = encoder.encode([clean_job])[0]
-            semantic_sim = float(np.dot(skills_emb, job_emb))
-            semantic_sim = max(0.0, min(1.0, semantic_sim))
+            semantic_sim = 0.5
+            if encoder is not None and skills_emb is not None:
+                try:
+                    job_emb = encoder.encode([clean_job])[0]
+                    dot_val = float(np.dot(skills_emb, job_emb))
+                    semantic_sim = max(0.0, min(1.0, dot_val))
+                except Exception:
+                    semantic_sim = 0.5
 
             initial_relevance = (semantic_sim * 0.6 + overlap_ratio * 0.4)
 
@@ -445,7 +471,7 @@ class RecommendationService:
             experience_req = item_data["experience_req"]
 
             # Mode selection based on inputs
-            if has_resume_context and desc_len >= 100:
+            if inference_service and inference_service.is_ready() and has_resume_context and desc_len >= 100:
                 # Mode A: Full Neural Résumé–Job Compatibility (PyTorch MatchNetwork + 770-dim features)
                 try:
                     pred = inference_service.predict_pair(
@@ -466,16 +492,28 @@ class RecommendationService:
                     )
                 except Exception as inf_err:
                     logger.warning(f"Neural inference fallback: {inf_err}")
-                    score = round(relevance * 100, 1)
+                    score = None
                     score_type = "unranked_inference_unavailable"
                     score_label = "Unranked (Inference Initializing)"
-                    classification = "Preliminary Fit"
+                    classification = "Preliminary Match"
                     semantic_similarity = round(semantic_sim, 4)
                     skill_coverage = round(overlap_ratio, 4)
                     relevance_explanation = (
                         "Listing retrieved successfully. Neural compatibility inference is currently initializing; "
-                        "results are ordered by preliminary keyword relevance."
+                        "results are presented without a compatibility score."
                     )
+            elif not inference_service or not getattr(inference_service, "is_ready", lambda: True)():
+                # Inference unavailable or failed to initialize - DO NOT FABRICATE SCORES
+                score = None
+                score_type = "unranked_inference_unavailable"
+                score_label = "Unranked (Scoring Unavailable)"
+                classification = "Unranked"
+                semantic_similarity = round(semantic_sim, 4)
+                skill_coverage = round(overlap_ratio, 4)
+                relevance_explanation = (
+                    "Listing retrieved successfully. Compatibility scoring is unavailable; "
+                    "results are listed without a fabricated compatibility score."
+                )
             elif desc_len < 100:
                 # Mode C: Incomplete / Brief Description (No fabricated score)
                 score = round(relevance * 100, 1)
@@ -541,10 +579,13 @@ class RecommendationService:
                 qualification_breakdown=qual_breakdown,
                 relevance_explanation=relevance_explanation,
                 disclaimer="This score estimates résumé–job compatibility according to the model’s training labels. It is not the probability of being hired.",
-                is_saved=is_saved
+                is_saved=is_saved,
+                job_id=cand.get("id"),
+                compatibility_score=score,
+                recommendation_reason=relevance_explanation
             ))
 
-        ranked_items.sort(key=lambda x: x.score, reverse=True)
+        ranked_items.sort(key=lambda x: (x.score is not None, x.score if x.score is not None else 0.0), reverse=True)
 
         total_count = len(ranked_items)
         paginated = ranked_items[req.offset : req.offset + req.limit]
@@ -671,4 +712,11 @@ class RecommendationService:
             include_external=False
         )
         res = RecommendationService.recommend_jobs_by_skills(db, req, user)
-        return [item.model_dump() for item in res.items]
+        items = []
+        for item in res.items:
+            d = item.model_dump()
+            d["job_id"] = item.id or item.job_id
+            d["compatibility_score"] = item.score if item.score is not None else item.compatibility_score
+            d["recommendation_reason"] = item.relevance_explanation or item.recommendation_reason
+            items.append(d)
+        return items

@@ -194,29 +194,62 @@ async function loadJobRecommendations(container) {
     }
 
     const list = h("div", { style: { display: "flex", flexDirection: "column", gap: "var(--space-3)" } },
-      recs.map(j =>
-        h("div", { class: "card", style: { padding: "var(--space-4)" } },
+      recs.map(j => {
+        const jobId = j.id || j.job_id;
+        const rawScore = j.score !== null && j.score !== undefined ? j.score : j.compatibility_score;
+        const hasScore = typeof rawScore === "number" && !isNaN(rawScore);
+        const scoreBadge = hasScore
+          ? h("span", { class: "badge badge--ai", text: `${Number(rawScore).toFixed(1)}% Fit` })
+          : h("span", { class: "badge badge--neutral", text: j.score_label || "Listing Available" });
+        const jobUrl = jobId ? `jobs.html?job_id=${encodeURIComponent(jobId)}` : (j.application_url || j.source_url || "jobs.html");
+
+        return h("div", { class: "card", style: { padding: "var(--space-4)" } },
           h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--space-2)" } },
             h("div", {},
-              h("h4", { style: { fontSize: "var(--font-size-sm)", fontWeight: "var(--font-weight-semibold)" }, text: j.title }),
-              h("span", { style: { fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }, text: `${j.company_name} • ${j.location}` })
+              h("h4", { style: { fontSize: "var(--font-size-sm)", fontWeight: "var(--font-weight-semibold)" }, text: j.title || "Job Listing" }),
+              h("span", { style: { fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }, text: `${j.company_name || "Organization"} • ${j.location || "Remote"}` })
             ),
-            h("span", { class: "badge badge--ai", text: `${Number(j.compatibility_score).toFixed(1)}% Fit` })
+            scoreBadge
           ),
           h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-3)" } },
-            h("span", { style: { fontSize: "var(--font-size-xs)", color: "var(--text-secondary)" }, text: j.recommendation_reason || "Neural Match" }),
-            h("a", { class: "btn btn--primary btn--sm", href: `jobs.html?job_id=${encodeURIComponent(j.job_id)}` }, "View Job")
+            h("span", { style: { fontSize: "var(--font-size-xs)", color: "var(--text-secondary)" }, text: j.relevance_explanation || j.recommendation_reason || "Neural Match" }),
+            h("a", { class: "btn btn--primary btn--sm", href: jobUrl }, "View Job")
           )
-        )
-      )
+        );
+      })
     );
     container.replaceChildren(list);
   } catch (err) {
-    container.replaceChildren(
-      h("div", { class: "notice notice--info" },
-        h("p", { text: "Upload your resume in the 'My Resumes' section to generate neural job recommendations." })
-      )
-    );
+    const status = err?.status;
+    const msg = (err?.message || "").toLowerCase();
+
+    if (status === 401 || msg.includes("unauthorized") || msg.includes("log in")) {
+      container.replaceChildren(
+        h("div", { class: "notice notice--warning" },
+          h("p", { text: "Please sign in to view your tailored job recommendations." }),
+          h("a", { class: "btn btn--secondary btn--sm", href: "login.html", style: { marginTop: "var(--space-2)" } }, "Sign In")
+        )
+      );
+    } else if (msg.includes("resume") || msg.includes("upload") || status === 404) {
+      container.replaceChildren(
+        h("div", { class: "notice notice--info" },
+          h("p", { text: "Upload your résumé in the 'My Resumes' section to generate neural job recommendations." }),
+          h("a", { class: "btn btn--secondary btn--sm", href: "resumes.html", style: { marginTop: "var(--space-2)" } }, "Go to Resumes")
+        )
+      );
+    } else {
+      const retryBtn = h("button", { class: "btn btn--ghost btn--sm", style: { marginTop: "var(--space-2)" }, text: "Retry" });
+      retryBtn.addEventListener("click", () => {
+        container.replaceChildren(loadingState("Retrying recommendations…"));
+        loadJobRecommendations(container);
+      });
+      container.replaceChildren(
+        h("div", { class: "notice notice--error" },
+          h("p", { text: `Unable to load job recommendations: ${err.message || "Network or service error"}` }),
+          retryBtn
+        )
+      );
+    }
   }
 }
 

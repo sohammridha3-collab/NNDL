@@ -23,8 +23,8 @@ frontend/env.js.backup
 backend/*.db
 *.db-journal
 backend/*.db-journal
-*.db.backup
-backend/*.db.backup
+*.db.backup*
+backend/*.db.backup*
 test_*.db
 test_inclusive_ats.db
 

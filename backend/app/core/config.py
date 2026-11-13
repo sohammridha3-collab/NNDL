@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from typing import List
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # ==============================================================================
@@ -67,6 +68,49 @@ class Settings(BaseSettings):
     ADZUNA_COUNTRY: str = os.getenv("ADZUNA_COUNTRY", "in")
     ENABLE_EXTERNAL_JOBS: bool = os.getenv("ENABLE_EXTERNAL_JOBS", "true").lower() in ("true", "1", "yes")
 
+    @field_validator("DATABASE_URL", mode="after")
+    @classmethod
+    def normalize_database_url(cls, v: str) -> str:
+        if not v:
+            return f"sqlite:///{(PROJECT_ROOT / 'inclusive_ats.db').as_posix()}"
+        if v.startswith("sqlite:///"):
+            path_part = v[len("sqlite:///"):]
+            if path_part.startswith(":memory:"):
+                return v
+            raw_path = Path(path_part)
+            # If path is relative (e.g. ./inclusive_ats.db or inclusive_ats.db)
+            if not raw_path.is_absolute() and not path_part.startswith("/") and not (len(path_part) > 2 and path_part[1] == ":"):
+                clean_name = path_part.lstrip("./\\")
+                resolved = (PROJECT_ROOT / clean_name).resolve()
+                return f"sqlite:///{resolved.as_posix()}"
+        return v
+
+    @field_validator("MODEL_PATH", mode="after")
+    @classmethod
+    def normalize_model_path(cls, v: str) -> str:
+        if not v:
+            return str((BACKEND_DIR / "app" / "ml" / "artifacts" / "model.pkl").resolve())
+        raw_path = Path(v.strip().lstrip("./\\"))
+        if not raw_path.is_absolute():
+            cand_backend = (BACKEND_DIR / raw_path).resolve()
+            cand_root = (PROJECT_ROOT / raw_path).resolve()
+            if cand_backend.exists():
+                return str(cand_backend)
+            elif cand_root.exists():
+                return str(cand_root)
+            return str(cand_backend)
+        return str(raw_path.resolve())
+
+    @field_validator("UPLOAD_DIR", mode="after")
+    @classmethod
+    def normalize_upload_dir(cls, v: str) -> str:
+        if not v:
+            return str((PROJECT_ROOT / "uploads").resolve())
+        raw_path = Path(v.strip().lstrip("./\\"))
+        if not raw_path.is_absolute():
+            return str((PROJECT_ROOT / raw_path).resolve())
+        return str(raw_path.resolve())
+
     @property
     def cors_origins(self) -> List[str]:
         origins = [
@@ -84,3 +128,11 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def redact_sensitive_url(url: str) -> str:
+    """Redacts credentials and passwords from connection strings for safe logging."""
+    if not url:
+        return ""
+    import re
+    return re.sub(r'://([^:]+):([^@]+)@', r'://\1:***@', str(url))

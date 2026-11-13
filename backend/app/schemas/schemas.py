@@ -328,12 +328,12 @@ class JobRecommendationItem(BaseModel):
     retrieved_at: Optional[str] = None
     is_cached: bool = False
     freshness_label: str = "Retrieved recently"
-    score: float  # 0 to 100
-    score_type: str  # "skills_only_relevance" or "model_probability_percent" or "unranked_sparse_description"
+    score: Optional[float] = None  # 0 to 100, None when unranked/unavailable
+    score_type: str  # "skills_only_relevance" or "model_probability_percent" or "unranked_sparse_description" or "unranked_inference_unavailable"
     score_label: str  # "Skills-Only Relevance" or "AI Résumé-Job Match Fit"
     classification: Optional[str] = None
-    semantic_similarity: float
-    skill_coverage: float
+    semantic_similarity: Optional[float] = 0.0
+    skill_coverage: Optional[float] = 0.0
     matched_skills: List[str]
     missing_skills: List[str]
     experience_requirements: Optional[str] = None
@@ -341,6 +341,10 @@ class JobRecommendationItem(BaseModel):
     relevance_explanation: str
     disclaimer: str = "This score estimates résumé–job compatibility according to the model’s training labels. It is not the probability of being hired."
     is_saved: bool = False
+    # Consumer compatibility aliases (e.g. dashboard.js)
+    job_id: Optional[str] = None
+    compatibility_score: Optional[float] = None
+    recommendation_reason: Optional[str] = None
 
 
 class SkillRecommendationRequest(BaseModel):

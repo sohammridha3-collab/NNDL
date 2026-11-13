@@ -71,9 +71,19 @@ app.add_middleware(
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled error processing {request.method} {request.url.path}: {exc}", exc_info=True)
+    headers = {}
+    origin = request.headers.get("origin")
+    allowed_list = settings.cors_origins
+    if origin and allowed_list:
+        if "*" in allowed_list or origin in allowed_list:
+            headers["Access-Control-Allow-Origin"] = origin
+            headers["Access-Control-Allow-Credentials"] = "true"
+            headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin, X-Requested-With"
+            headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "An internal server error occurred. Please try again later."}
+        content={"detail": "An internal server error occurred. Please try again later."},
+        headers=headers
     )
 
 

@@ -1,7 +1,7 @@
 import logging
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
-from app.core.config import settings
+from app.core.config import settings, redact_sensitive_url
 
 logger = logging.getLogger("inclusive_ats.db")
 
@@ -30,17 +30,19 @@ def create_database_engine():
         # Verify connection immediately
         with engine.connect() as conn:
             pass
-        db_label = target_url.split("@")[-1] if "@" in target_url else "SQLite Database"
+        safe_url = redact_sensitive_url(target_url)
+        db_label = safe_url.split("@")[-1] if "@" in safe_url else "SQLite Database"
         logger.info(f"Database connected successfully: {db_label}")
         return engine
     except Exception as e:
+        safe_url = redact_sensitive_url(target_url)
         logger.error(
-            f"CRITICAL: Failed to connect to configured DATABASE_URL: '{target_url}'. Error: {e}",
+            f"CRITICAL: Failed to connect to configured DATABASE_URL: '{safe_url}'. Error: {e}",
             exc_info=True
         )
         # Fail clearly with actionable guidance instead of silent database switching
         raise RuntimeError(
-            f"Database Connection Failure: Could not establish a connection to '{target_url}'. "
+            f"Database Connection Failure: Could not establish a connection to '{safe_url}'. "
             f"Underlying error: {e}. "
             "Please check that your database server is running and credentials are valid. "
             "For local development, ensure DATABASE_URL is set to a valid SQLite database path."
