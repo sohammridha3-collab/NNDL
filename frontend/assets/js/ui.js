@@ -158,6 +158,7 @@ export function toast(message, { type = "info", timeout = type === "error" ? 800
 /* ---------------------------------------------------------------- Errors */
 export function errorMessage(err, fallback = "Something went wrong.") {
   if (!err) return fallback;
+  if (typeof err === "string") return err.trim() || fallback;
   if (err instanceof ApiError) {
     if (err.kind === "server" && err.message.startsWith("An internal server error")) {
       return "The server could not complete this request. If this keeps happening, the model service or database may be unavailable.";
@@ -236,19 +237,27 @@ export function emptyState(opts = {}) {
   );
 }
 
-export function errorState(err, { onRetry = null, title = null } = {}) {
+export function errorState(err, opts = {}) {
+  const options = typeof opts === "function" ? { onRetry: opts } : opts || {};
+  const { onRetry = null, title = null } = options;
   const kind = err && err.kind;
   const heading =
     title ||
     (kind === "network"
       ? "Backend unavailable"
-      : kind === "forbidden"
-        ? "Access restricted"
-        : kind === "timeout"
-          ? "Request timed out"
-          : kind === "not_found"
-            ? "Not found"
-            : "Could not load this section");
+      : kind === "auth"
+        ? "Authentication required"
+        : kind === "forbidden"
+          ? "Access restricted"
+          : kind === "timeout"
+            ? "Request timed out"
+            : kind === "not_found"
+              ? "Not found"
+              : kind === "unavailable"
+                ? "AI model or service unavailable"
+                : kind === "server"
+                  ? "Server error"
+                  : "Could not load this section");
   return h(
     "div",
     { class: "state state--error", role: "alert" },

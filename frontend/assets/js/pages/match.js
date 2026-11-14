@@ -85,11 +85,14 @@ async function loadSelectOptions() {
         );
       }
     }
-  } catch {
+  } catch (err) {
     if (resumeSelect) {
       resumeSelect.replaceChildren(
-        h("option", { value: "" }, "— Paste resume text below —")
+        h("option", { value: "" }, "— Could not load saved resumes (paste text below) —")
       );
+    }
+    if (!err?.isAborted) {
+      toast(errorMessage(err, "Could not load your saved resumes from the backend."), "error");
     }
   }
 
@@ -108,11 +111,14 @@ async function loadSelectOptions() {
         );
       }
     }
-  } catch {
+  } catch (err) {
     if (jobSelect) {
       jobSelect.replaceChildren(
-        h("option", { value: "" }, "— Paste job description below —")
+        h("option", { value: "" }, "— Could not load posted jobs (paste text below) —")
       );
+    }
+    if (!err?.isAborted) {
+      toast(errorMessage(err, "Could not load posted jobs from the backend."), "error");
     }
   }
 }
@@ -303,7 +309,7 @@ function renderMatchResults(container, res) {
       ),
       h("h3", { style: { fontSize: "var(--font-size-lg)", color: "var(--text-primary)" }, text: isStrong ? "High Compatibility Alignment" : "Partial or Weaker Match" }),
       h("p", { style: { fontSize: "var(--font-size-sm)", color: "var(--text-secondary)" }, text: `Model Probability (${(res.compatibility_score / 100).toFixed(4)}) evaluated against validation decision threshold (${res.decision_threshold}).` }),
-      
+
       // Explicit dataset-label notice
       h("div", { class: "notice notice--info", style: { marginTop: "var(--space-2)", padding: "var(--space-2) var(--space-3)", fontSize: "var(--font-size-xs)" } },
         h("span", { style: { fontWeight: "var(--font-weight-semibold)" }, text: "Notice: " }),
@@ -337,11 +343,11 @@ function renderMatchResults(container, res) {
           ),
           reqBreakdown.essential_skills?.length > 0
             ? h("div", { class: "chip-list" },
-                reqBreakdown.essential_skills.map((s) => {
-                  const isMatched = reqBreakdown.matched_essential?.includes(s);
-                  return chip(s, isMatched ? "matched" : "missing");
-                })
-              )
+              reqBreakdown.essential_skills.map((s) => {
+                const isMatched = reqBreakdown.matched_essential?.includes(s);
+                return chip(s, isMatched ? "matched" : "missing");
+              })
+            )
             : h("p", { class: "field__hint", text: "No distinct essential tags isolated." })
         ),
 
@@ -355,11 +361,11 @@ function renderMatchResults(container, res) {
           ),
           reqBreakdown.preferred_skills?.length > 0
             ? h("div", { class: "chip-list" },
-                reqBreakdown.preferred_skills.map((s) => {
-                  const isMatched = reqBreakdown.matched_preferred?.includes(s);
-                  return chip(s, isMatched ? "matched" : "missing");
-                })
-              )
+              reqBreakdown.preferred_skills.map((s) => {
+                const isMatched = reqBreakdown.matched_preferred?.includes(s);
+                return chip(s, isMatched ? "matched" : "missing");
+              })
+            )
             : h("p", { class: "field__hint", text: "No explicit preferred qualifications section in job text." })
         )
       )
@@ -436,8 +442,8 @@ function renderMatchResults(container, res) {
     h("h4", { class: "card__title", style: { marginBottom: "var(--space-3)" } }, icon("sparkles", { size: 18 }), " Grounded Suggestions & Optimization"),
     res.recommendations && res.recommendations.length > 0
       ? h("ul", { style: { paddingLeft: "var(--space-5)", fontSize: "var(--font-size-sm)", color: "var(--text-secondary)", display: "flex", flexDirection: "column", gap: "var(--space-2)" } },
-          res.recommendations.map(r => h("li", { text: r }))
-        )
+        res.recommendations.map(r => h("li", { text: r }))
+      )
       : h("p", { class: "field__hint", text: "No specific recommendations generated for this pair." }),
 
     // SDG 10 Compliance Callout

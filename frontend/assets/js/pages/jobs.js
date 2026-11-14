@@ -823,13 +823,14 @@ async function loadSkillRecommendations() {
     updateStepper(5);
   } catch (err) {
     const isRateLimited = err?.status === 429 || (err?.message && /rate.limit|quota/i.test(err.message));
+    const displayErr = isRateLimited
+      ? "API Provider Quota Limit Reached: External job provider's rate limit reached for today. Displaying verified platform postings."
+      : err;
     container.replaceChildren(
-      errorState(
-        isRateLimited
-          ? "API Provider Quota Limit Reached: External job provider's rate limit reached for today. Displaying verified platform postings."
-          : errorMessage(err, "Failed to retrieve job recommendations. Your input criteria have been preserved."),
-        () => loadSkillRecommendations()
-      )
+      errorState(displayErr, {
+        title: isRateLimited ? "Quota limit reached" : undefined,
+        onRetry: () => loadSkillRecommendations()
+      })
     );
   } finally {
     setBusy(findBtn, false);
@@ -931,7 +932,10 @@ async function loadCatalogJobs() {
     if (paginationContainer) paginationContainer.replaceChildren();
   } catch (err) {
     container.replaceChildren(
-      errorState("Failed to load jobs from catalog.", () => loadCatalogJobs())
+      errorState(err, {
+        title: "Failed to load jobs",
+        onRetry: () => loadCatalogJobs()
+      })
     );
   }
 }

@@ -14,13 +14,14 @@ import { CONFIG, apiUrl, rootUrl } from "./config.js";
 import { session } from "./session.js";
 
 export class ApiError extends Error {
-  constructor({ status = 0, kind = "unknown", message = "Something went wrong.", detail = null, fieldErrors = {} } = {}) {
+  constructor({ status = 0, kind = "unknown", message = "Something went wrong.", detail = null, fieldErrors = {}, payload = null } = {}) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.kind = kind;
     this.detail = detail;
     this.fieldErrors = fieldErrors;
+    this.payload = payload;
   }
   get isAborted() {
     return this.kind === "aborted";
@@ -75,7 +76,8 @@ export function errorFromResponse(status, body) {
   } else if (typeof detail === "string" && detail.trim() && !(status >= 500 && detail.startsWith("<"))) {
     message = detail;
   }
-  return new ApiError({ status, kind, message, detail, fieldErrors });
+  const payload = body && typeof body === "object" ? body : null;
+  return new ApiError({ status, kind, message, detail, fieldErrors, payload });
 }
 
 /* ---------- auth-expiry hook (set by the app shell) ---------- */

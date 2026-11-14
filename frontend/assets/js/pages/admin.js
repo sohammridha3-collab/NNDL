@@ -49,7 +49,7 @@ async function loadAdminOverview() {
     );
   } catch (err) {
     container.replaceChildren(
-      h("div", { class: "notice notice--error" }, h("p", { text: "Could not load admin platform metrics." }))
+      errorState(err, { title: "Could not load admin metrics", onRetry: loadAdminOverview })
     );
   }
 }

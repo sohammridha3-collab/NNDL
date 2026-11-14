@@ -118,6 +118,9 @@ class Settings(BaseSettings):
             for origin in self.ALLOWED_ORIGINS.split(",")
             if origin.strip()
         ]
+        prod_frontend = "https://inclusive-ats-frontend.onrender.com"
+        if "*" not in origins and prod_frontend not in origins:
+            origins.append(prod_frontend)
         return origins
 
     model_config = SettingsConfigDict(

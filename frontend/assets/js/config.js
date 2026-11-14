@@ -15,9 +15,24 @@ function cleanOrigin(value, fallback) {
   return v;
 }
 
+function getDefaultOrigin() {
+  if (typeof window !== "undefined") {
+    try {
+      const host = window.location.hostname;
+      const isLocal = !host || host === "localhost" || host === "127.0.0.1" || host === "::1" || window.location.protocol === "file:";
+      if (!isLocal) {
+        return "https://inclusive-ats-backend.onrender.com";
+      }
+    } catch {
+      // Local fallback
+    }
+  }
+  return "http://127.0.0.1:8001";
+}
+
 export const CONFIG = Object.freeze({
   /** Backend origin (scheme + host + port). */
-  API_ORIGIN: cleanOrigin(runtime.API_ORIGIN, "http://127.0.0.1:8001"),
+  API_ORIGIN: cleanOrigin(runtime.API_ORIGIN, getDefaultOrigin()),
   /** Versioned API prefix — settings.API_V1_STR in the backend. */
   API_PREFIX: "/api/v1",
   /** Probes are mounted at the application root, outside /api/v1. */

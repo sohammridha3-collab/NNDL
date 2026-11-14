@@ -168,3 +168,123 @@ def test_dashboard_recommendation_contract(client):
         assert "company_name" in item
         assert "location" in item
 
+
+def test_cors_preflight_production_render_origin(client):
+    """Verify CORS preflight succeeds for deployed frontend on Render."""
+    prod_origin = "https://inclusive-ats-frontend.onrender.com"
+    res = client.options(
+        "/api/v1/auth/login",
+        headers={
+            "Origin": prod_origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "Content-Type, Authorization"
+        }
+    )
+    assert res.status_code == 200
+    assert res.headers.get("access-control-allow-origin") == prod_origin
+    assert res.headers.get("access-control-allow-credentials") == "true"
+
+
+def test_extract_skills_graceful_without_model(db):
+    """Verify skill extraction functions cleanly using fallback vocabulary when model is offline."""
+    from app.schemas.schemas import SkillExtractionRequest
+    with patch("app.ml.inference.MLInferenceService.is_ready", return_value=False), \
+         patch("app.ml.inference.MLInferenceService.get_instance", side_effect=RuntimeError("Model offline")):
+        
+        req = SkillExtractionRequest(
+            text="Experienced software engineer proficient in Python, React, Docker, and PostgreSQL."
+        )
+        res = RecommendationService.extract_skills_from_input(db, req)
+        assert res.count >= 2
+        assert "python" in [s.lower() for s in res.skills]
+
+
+def test_app_main_lazy_ml_import():
+    """Importing app.main must not eagerly import torch or sentence_transformers so port 8001 binds fast."""
+    import subprocess
+    import sys
+
+    code = (
+        f"import sys; sys.path.insert(0, {str(BACKEND_DIR)!r}); "
+        "import app.main; "
+        "assert 'sentence_transformers' not in sys.modules, 'sentence_transformers imported eagerly'; "
+        "assert 'torch' not in sys.modules, 'torch imported eagerly'; "
+        "print('LAZY_IMPORT_OK')"
+    )
+    proc = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=str(PROJECT_ROOT),
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert proc.returncode == 0, f"stdout={proc.stdout}\nstderr={proc.stderr}"
+    assert "LAZY_IMPORT_OK" in proc.stdout
+
+
+def test_endpoints_available_while_model_loading(client, db):
+    """Auth, dashboard, /health, /openapi.json, and job retrieval remain available during ML loading; /ready & ML matching return 503."""
+    from fastapi import HTTPException
+    from app.ml.inference import MLInferenceService, ModelState
+
+    # Register & verify auth works while ML is warming up
+    reg = client.post("/api/v1/auth/register", json={
+        "email": "loading_state_tester@example.com",
+        "password": "Password123!",
+        "full_name": "Loading State Tester",
+        "role": "candidate",
+    })
+    assert reg.status_code == 201
+    token = reg.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    loading_status = {
+        "state": "loading",
+        "is_ready": False,
+        "error": None,
+        "model_type": None,
+        "threshold": None,
+    }
+    loading_exc = HTTPException(
+        status_code=503,
+        detail="ML Inference Engine is currently warming up. Please retry in a few seconds.",
+        headers={"Retry-After": "5"},
+    )
+
+    with patch.object(MLInferenceService, "is_ready", return_value=False), \
+         patch.object(MLInferenceService, "status_dict", return_value=loading_status), \
+         patch.object(MLInferenceService, "get_instance", side_effect=loading_exc):
+        health = client.get("/health")
+        assert health.status_code == 200
+        assert health.json()["status"] == "healthy"
+
+        openapi = client.get("/openapi.json")
+        assert openapi.status_code == 200
+
+        ready = client.get("/ready?wait=0")
+        assert ready.status_code == 503
+        ready_json = ready.json()
+        assert ready_json["ready"] is False
+        assert ready_json["model_state"] == "loading"
+        assert "warming up" in ready_json["detail"].lower()
+
+        dash = client.get("/api/v1/dashboard/candidate", headers=headers)
+        assert dash.status_code == 200
+
+        recs = client.get("/api/v1/recommendations/jobs?limit=3", headers=headers)
+        assert recs.status_code == 200
+        assert "recommendations" in recs.json()
+
+        match_res = client.post(
+            "/api/v1/matching/predict",
+            headers=headers,
+            json={
+                "resume_text": "Experienced Python FastAPI backend developer with PostgreSQL and Docker skills.",
+                "job_text": "Seeking a Python FastAPI engineer experienced with SQL databases and containers.",
+            },
+        )
+        assert match_res.status_code == 503
+        assert "warming up" in match_res.json()["detail"].lower()
+
+
+

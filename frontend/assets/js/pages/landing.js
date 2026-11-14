@@ -33,25 +33,70 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Setup 3D Cursor Parallax
   setupHeroParallax();
 
-  // Check backend health & model readiness
+  // Check backend health & model readiness (with auto-retry while warming up or offline)
   const statusBadge = $("#backend-status");
   if (statusBadge) {
-    try {
-      const health = await Api.system.health();
-      if (health && health.status === "healthy") {
+    let attempts = 0;
+    let pollTimer = null;
+
+    const refreshBackendStatus = async () => {
+      attempts += 1;
+      try {
+        const health = await Api.system.health();
+        if (health && health.status === "healthy") {
+          try {
+            const ready = await Api.system.ready({ query: { wait: 0 } });
+            if (ready && ready.ready) {
+              statusBadge.replaceChildren(
+                icon("check", { size: 14 }),
+                document.createTextNode(" API & AI Match Engine Online")
+              );
+              statusBadge.className = "badge badge--success";
+              statusBadge.title = `Connected to ${CONFIG.API_ORIGIN}`;
+              return;
+            }
+          } catch (readyErr) {
+            const state = readyErr?.payload?.model_state || readyErr?.payload?.ml_model;
+            if (state === "failed") {
+              statusBadge.replaceChildren(
+                icon("alert", { size: 14 }),
+                document.createTextNode(" API Online • ML Model Unavailable")
+              );
+              statusBadge.className = "badge badge--warning";
+              statusBadge.title = readyErr?.payload?.model_error || readyErr.message || "";
+              return;
+            }
+            statusBadge.replaceChildren(
+              icon("alert", { size: 14 }),
+              document.createTextNode(" API Online • ML Warming Up…")
+            );
+            statusBadge.className = "badge badge--warning";
+            statusBadge.title = `API reachable at ${CONFIG.API_ORIGIN}; AI model is loading in background.`;
+            if (attempts < 30) {
+              pollTimer = setTimeout(refreshBackendStatus, 3000);
+            }
+            return;
+          }
+        }
+      } catch (healthErr) {
+        const isLocal = /127\.0\.0\.1|localhost/.test(CONFIG.API_ORIGIN);
         statusBadge.replaceChildren(
-          icon("check", { size: 14 }),
-          document.createTextNode(" AI Match Engine Online")
+          icon("alert", { size: 14 }),
+          document.createTextNode(isLocal ? " Backend Offline (127.0.0.1:8001)" : " Backend Connecting…")
         );
-        statusBadge.className = "badge badge--success";
+        statusBadge.className = isLocal ? "badge badge--danger" : "badge badge--warning";
+        statusBadge.title = healthErr?.message || `Cannot reach ${CONFIG.API_ORIGIN}`;
+        if (attempts < 12) {
+          pollTimer = setTimeout(refreshBackendStatus, 5000);
+        }
       }
-    } catch {
-      statusBadge.replaceChildren(
-        icon("alert", { size: 14 }),
-        document.createTextNode(" Backend Connecting…")
-      );
-      statusBadge.className = "badge badge--warning";
-    }
+    };
+
+    window.addEventListener("pagehide", () => {
+      if (pollTimer) clearTimeout(pollTimer);
+    }, { once: true });
+
+    await refreshBackendStatus();
   }
 });
 

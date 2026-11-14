@@ -130,8 +130,14 @@ class RecommendationService:
         """
         Extracts recognized skills from an existing stored resume or direct text input.
         """
-        inference_service = MLInferenceService.get_instance()
-        vocab = inference_service.vocabulary
+        vocab = DEFAULT_SKILLS
+        try:
+            if MLInferenceService.is_ready():
+                inf = MLInferenceService.get_instance(block=False)
+                if inf and inf.vocabulary:
+                    vocab = inf.vocabulary
+        except Exception:
+            vocab = DEFAULT_SKILLS
 
         target_text = ""
         source_label = "direct_text"

@@ -18,7 +18,7 @@ def test_health_and_readiness(client):
     assert health.status_code == 200
     assert health.json()["status"] == "healthy"
 
-    ready = client.get("/ready")
+    ready = client.get("/ready?wait=60")
     assert ready.status_code == 200
     assert ready.json()["ready"] is True
     assert ready.json()["ml_model"] == "loaded"

@@ -7,11 +7,8 @@ import threading
 from typing import Any, Dict, List, Optional
 from fastapi import HTTPException
 import numpy as np
-import torch
-from torch import nn
 
 from app.core.config import settings
-from app.ml.embeddings import EmbeddingEncoder
 from app.ml.preprocessing import (
     clean,
     calculate_skill_overlap,
@@ -30,25 +27,48 @@ class ModelState(str, Enum):
     FAILED = "failed"
 
 
-class MatchNetwork(nn.Module):
-    """
-    Trained PyTorch Neural Classifier Architecture.
-    Matches the exact architecture defined and trained in RESUME_AND_JOB.ipynb.
-    """
-    def __init__(self):
-        super().__init__()
-        self.layers = nn.Sequential(
-            nn.Linear(770, 256),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(256, 64),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(64, 1)
-        )
+_MatchNetworkCls = None
 
-    def forward(self, matrix: torch.Tensor) -> torch.Tensor:
-        return self.layers(matrix).squeeze(-1)
+
+def _get_match_network_class():
+    global _MatchNetworkCls
+    if _MatchNetworkCls is None:
+        import torch
+        from torch import nn
+
+        class MatchNetwork(nn.Module):
+            """
+            Trained PyTorch Neural Classifier Architecture.
+            Matches the exact architecture defined and trained in RESUME_AND_JOB.ipynb.
+            """
+
+            def __init__(self):
+                super().__init__()
+                self.layers = nn.Sequential(
+                    nn.Linear(770, 256),
+                    nn.ReLU(),
+                    nn.Dropout(0.3),
+                    nn.Linear(256, 64),
+                    nn.ReLU(),
+                    nn.Dropout(0.2),
+                    nn.Linear(64, 1),
+                )
+
+            def forward(self, matrix: torch.Tensor) -> torch.Tensor:
+                return self.layers(matrix).squeeze(-1)
+
+        _MatchNetworkCls = MatchNetwork
+    return _MatchNetworkCls
+
+
+def _create_match_network():
+    return _get_match_network_class()()
+
+
+def __getattr__(name: str):
+    if name == "MatchNetwork":
+        return _get_match_network_class()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 class MLInferenceService:
@@ -105,8 +125,12 @@ class MLInferenceService:
         if self.scaler is None:
             raise ValueError("StandardScaler missing from model bundle.")
 
+        import torch
+        from app.ml.embeddings import EmbeddingEncoder
+
+        self._torch = torch
         # Reconstruct PyTorch MatchNetwork
-        self.model = MatchNetwork().to(self.device)
+        self.model = _create_match_network().to(self.device)
         weights = bundle.get("weights", {})
         state_dict = {k: torch.from_numpy(v).to(self.device) for k, v in weights.items()}
         self.model.load_state_dict(state_dict)
@@ -125,7 +149,7 @@ class MLInferenceService:
         )
 
     @classmethod
-    def get_instance(cls, wait_timeout: float = 25.0, block: bool = True) -> "MLInferenceService":
+    def get_instance(cls, wait_timeout: float = 60.0, block: bool = True) -> "MLInferenceService":
         """
         Thread-safe singleton accessor with non-blocking graceful degradation.
         If the model is currently loading, waits up to wait_timeout. If still warming up,
@@ -282,6 +306,10 @@ class MLInferenceService:
         feature_matrix = self.build_features([resume_text], [job_text], mask=mask)
         
         # Apply trained StandardScaler
+        torch = getattr(self, "_torch", None)
+        if torch is None:
+            import torch
+            self._torch = torch
         scaled_matrix = self.scaler.transform(feature_matrix).astype(np.float32)
         tensor_input = torch.from_numpy(scaled_matrix).to(self.device)
 

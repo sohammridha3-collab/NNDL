@@ -1,9 +1,7 @@
 import hashlib
 import logging
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 import numpy as np
-import torch
-from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger("inclusive_ats.ml.embeddings")
 
@@ -22,6 +20,10 @@ class EmbeddingEncoder:
         self.batch_size = batch_size
         self._cache: Dict[str, np.ndarray] = {}
         
+        import torch
+        from sentence_transformers import SentenceTransformer
+
+        self._torch = torch
         logger.info(f"Loading SentenceTransformer encoder '{model_name}' on {device}...")
         self.encoder = SentenceTransformer(model_name, device=device)
         self.encoder.eval()
@@ -62,9 +64,9 @@ class EmbeddingEncoder:
             def flush():
                 tokens = self.tokenizer.pad(batch, padding=True, return_tensors="pt")
                 tokens = {k: v.to(self.encoder.device) for k, v in tokens.items()}
-                with torch.inference_mode():
+                with self._torch.inference_mode():
                     output = self.encoder(tokens)["sentence_embedding"]
-                    output = torch.nn.functional.normalize(output, p=2, dim=1).cpu().numpy()
+                    output = self._torch.nn.functional.normalize(output, p=2, dim=1).cpu().numpy()
                 for vec, owner, size in zip(output, owners, sizes):
                     sums[owner] += vec * size
                     weights[owner] += size

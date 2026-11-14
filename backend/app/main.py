@@ -9,7 +9,7 @@ if str(backend_dir) not in sys.path:
 import threading
 from contextlib import asynccontextmanager
 import logging
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -99,8 +99,8 @@ def health_check():
 
 
 @app.get("/ready", tags=["System"])
-def readiness_check():
-    """Readiness probe: checks database connection and ML model state."""
+def readiness_check(wait: float = Query(default=0.0, ge=0.0, le=60.0)):
+    """Readiness probe: checks database connection and ML model state immediately (or waits up to `wait` seconds)."""
     db_ok = False
     db_msg = "unreachable"
     try:
@@ -110,24 +110,38 @@ def readiness_check():
     except Exception as e:
         db_msg = f"error: {str(e)}"
 
-    if not MLInferenceService.is_ready():
-        # Allow background warmup up to 10s to complete
-        MLInferenceService._ready_event.wait(timeout=10.0)
+    if wait > 0 and not MLInferenceService.is_ready():
+        MLInferenceService._ready_event.wait(timeout=wait)
 
     ml_status = MLInferenceService.status_dict()
     all_ready = db_ok and ml_status.get("is_ready", False)
+    ml_state = ml_status.get("state", "unknown")
+
+    detail = None
+    if not db_ok:
+        detail = f"Database unavailable: {db_msg}"
+    elif ml_state == "loading":
+        detail = "AI matching model is warming up."
+    elif ml_state == "failed":
+        detail = ml_status.get("error") or "AI matching model failed to load."
+    elif not all_ready:
+        detail = "AI matching model is not initialized yet."
+
+    content = {
+        "ready": all_ready,
+        "database": db_msg,
+        "ml_model": "loaded" if all_ready else ml_state,
+        "model_state": ml_state,
+        "model_type": ml_status.get("model_type"),
+        "threshold": ml_status.get("threshold"),
+        "model_error": ml_status.get("error"),
+    }
+    if detail:
+        content["detail"] = detail
 
     return JSONResponse(
         status_code=status.HTTP_200_OK if all_ready else status.HTTP_503_SERVICE_UNAVAILABLE,
-        content={
-            "ready": all_ready,
-            "database": db_msg,
-            "ml_model": "loaded" if all_ready else ml_status.get("state", "unknown"),
-            "model_state": ml_status.get("state", "unknown"),
-            "model_type": ml_status.get("model_type"),
-            "threshold": ml_status.get("threshold"),
-            "model_error": ml_status.get("error")
-        }
+        content=content,
     )
 
 

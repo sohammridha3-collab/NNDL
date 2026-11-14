@@ -86,22 +86,23 @@ def main():
         print("!" * 76 + "\n", file=sys.stderr)
         sys.exit(1)
 
-    print("\n" + "=" * 76)
-    print("  >>> INCLUSIVE RESUME & JOB MATCHING API (SDG 10) <<<")
-    print(f"  -> Local API Service:      http://{host}:{port}")
-    print(f"  -> Interactive Swagger UI: http://{host}:{port}/docs")
-    print(f"  -> Health Check Endpoint:  http://{host}:{port}/health")
-    print(f"  -> Readiness Check Probe:  http://{host}:{port}/ready")
-    print("  -> Frontend Application:   http://127.0.0.1:5500/frontend/ (or index.html)")
-    print("=" * 76 + "\n")
+    print("\n" + "=" * 76, flush=True)
+    print("  >>> INCLUSIVE RESUME & JOB MATCHING API (SDG 10) <<<", flush=True)
+    print(f"  -> Local API Service:      http://{host}:{port}", flush=True)
+    print(f"  -> Interactive Swagger UI: http://{host}:{port}/docs", flush=True)
+    print(f"  -> Health Check Endpoint:  http://{host}:{port}/health", flush=True)
+    print(f"  -> Readiness Check Probe:  http://{host}:{port}/ready", flush=True)
+    print("  -> Frontend Application:   http://127.0.0.1:5500/frontend/ (or index.html)", flush=True)
+    print("=" * 76 + "\n", flush=True)
+
+    from app.main import app
 
     uvicorn.run(
-        "app.main:app",
+        app,
         host=host,
         port=port,
         reload=False,
-        log_level="info",
-        app_dir=str(BACKEND_DIR)
+        log_level="info"
     )
 
 

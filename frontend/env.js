@@ -1,15 +1,26 @@
 /*
  * Public runtime configuration (NOT secret).
  *
- * This classic script is loaded before the ES modules on every page and lets you
- * point the same static build at a different backend without editing source code.
- * Never put credentials, API keys or server secrets here — this file is public.
- *
- * Local development: leave the values below as-is (backend on http://127.0.0.1:8001).
- * Production (e.g. Render static site): overwrite this file during the build, e.g.
- *   echo "window.APP_CONFIG={API_ORIGIN:'https://YOUR-BACKEND.onrender.com'};" > env.js
+ * This script is loaded synchronously before ES modules on every page.
+ * It dynamically sets window.APP_CONFIG.API_ORIGIN:
+ *   - Local development (localhost, 127.0.0.1, or local file): targets http://127.0.0.1:8001
+ *   - Deployed frontend (e.g. Render static site): targets https://inclusive-ats-backend.onrender.com
+ *   - Honors explicit window.APP_CONFIG.API_ORIGIN overrides (e.g. build scripts).
  */
-window.APP_CONFIG = window.APP_CONFIG || {
-  API_ORIGIN: "http://127.0.0.1:8001"
-};
+(function () {
+  var isLocal = false;
+  try {
+    var host = window.location.hostname;
+    isLocal = !host || host === "localhost" || host === "127.0.0.1" || host === "::1" || window.location.protocol === "file:";
+  } catch (e) {
+    isLocal = true;
+  }
 
+  var PROD_BACKEND_ORIGIN = "https://inclusive-ats-backend.onrender.com";
+  var LOCAL_BACKEND_ORIGIN = "http://127.0.0.1:8001";
+
+  window.APP_CONFIG = window.APP_CONFIG || {};
+  if (!window.APP_CONFIG.API_ORIGIN) {
+    window.APP_CONFIG.API_ORIGIN = isLocal ? LOCAL_BACKEND_ORIGIN : PROD_BACKEND_ORIGIN;
+  }
+})();
